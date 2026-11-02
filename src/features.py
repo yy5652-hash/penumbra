@@ -41,9 +41,11 @@ def clear_sky_ghi(elevation):
     return out
 
 
-def load_weather():
-    df = pd.concat([pd.read_parquet(p) for p in sorted(Path("data/weather").glob("*.parquet"))], ignore_index=True)
-    return df
+def load_weather(live=False):
+    folders = ["data/weather", "data/weather_live"] if live else ["data/weather"]
+    files = [p for f in folders for p in sorted(Path(f).glob("*.parquet"))]
+    df = pd.concat([pd.read_parquet(p) for p in files], ignore_index=True)
+    return df.drop_duplicates(["region", "time"], keep="last")
 
 
 def weather_features(raw, lat, lon):
@@ -108,11 +110,16 @@ def add_lags(g):
     return g.reset_index()
 
 
-def build():
+def build(out=OUT, live=False):
+    """With live, append the datasets Elia started on 2026-10-26 and keep rows whose outcome is not known yet."""
     elia = pd.read_parquet("data/raw/elia_ods032.parquet")
     elia["datetime"] = pd.to_datetime(elia["datetime"], utc=True).astype("datetime64[ns, UTC]")
+    if live:
+        new = pd.read_parquet("data/raw/elia_live.parquet")
+        new["datetime"] = new["datetime"].astype("datetime64[ns, UTC]")
+        elia = pd.concat([elia[elia.datetime < new.datetime.min()], new], ignore_index=True)
     elia = elia[elia.region.isin(PROVINCES + ["Belgium"])].drop_duplicates(["datetime", "region"])
-    weather = load_weather()
+    weather = load_weather(live)
     parts = {}
     for name, (lat, lon) in PLACES.items():
         parts[name] = weather_features(weather[weather.region == name], lat, lon)
@@ -132,9 +139,9 @@ def build():
             t[dst] = t[src] / t["monitoredcapacity"]
         tables.append(add_lags(t).assign(region=name))
     table = pd.concat(tables, ignore_index=True)
-    table = table[(table.elevation > 0) & table.cf.notna() & table.k_mean.notna()]
+    table = table[(table.elevation > 0) & table.k_mean.notna() & (live | table.cf.notna())]
     table["date"] = table.datetime.dt.floor("D")
-    table.to_parquet(OUT)
+    table.to_parquet(out)
     print(table.shape, table.datetime.min(), table.datetime.max())
     print(table.groupby("region").cf.agg(["count", "mean", "max"]).round(3))
     return table
