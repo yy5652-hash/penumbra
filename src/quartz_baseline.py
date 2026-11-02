@@ -63,6 +63,7 @@ def main():
     # The first day's cutoff falls before the archive starts, so scoring begins one day later.
     days = pd.date_range(pd.Timestamp(START) + pd.Timedelta(days=1), END, freq="D")
     for place, (lat, lon) in PLACES.items():
+        OUT.mkdir(exist_ok=True)
         path = OUT / f"pred_{place}.parquet"
         if path.exists():
             continue
@@ -86,4 +87,8 @@ def main():
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["gb"]:  # the three GB regions of the portability test
+        from download_gb import GB
+        PLACES = {name: (lat, lon) for name, (_, lat, lon) in GB.items()}
+        OUT, START = Path("data/quartz_gb"), "2025-10-30"
     main()
