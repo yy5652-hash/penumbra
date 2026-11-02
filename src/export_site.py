@@ -67,7 +67,15 @@ def shifts():
     pool = pd.read_parquet("data/results/test_weather.parquet")[keep]
     led = read_ledger()
     if "weather" in led:
-        pool = pd.concat([pool, led["weather"][keep]], ignore_index=True)
+        pool["datetime"] = pool["datetime"].astype("datetime64[ns, UTC]")
+        pool["date"] = pool["date"].astype("datetime64[ns, UTC]")
+        extra = led["weather"][keep].copy()
+        extra["datetime"] = extra["datetime"].astype("datetime64[ns, UTC]")
+        extra["date"] = extra["date"].astype("datetime64[ns, UTC]")
+        pool = pd.concat([pool, extra], ignore_index=True)
+    for frame, cols in ((pool, ["datetime", "date"]), (table, ["datetime"])):
+        for col in cols:  # parquet and JSON give different datetime types
+            frame[col] = frame[col].astype("datetime64[ns, UTC]")
     pool = pool[pool.region != "Belgium"].merge(table, on=["datetime", "region"]).dropna(subset=["cf"])
     last = pool.date.max()
     cal = pool[pool.date > last - pd.Timedelta(days=60)]
@@ -92,6 +100,8 @@ def forecast_python(raw, lat, lon, month, sh):
     b = (feats.elevation.values > 15).astype(int) * 3 + np.digitize(w, [0.05, 0.15])
     p10c = np.clip(pr[:, 0] - np.array(sh["lo"])[b], 0, None)
     p90c = pr[:, 2] + np.array(sh["hi"])[b]
+    # Thin bins can shift a band past its median, which a user-facing range must not show.
+    p10c, p90c = np.minimum(p10c, pr[:, 1]), np.maximum(p90c, pr[:, 1])
     return feats, pr, p10c, p90c
 
 
