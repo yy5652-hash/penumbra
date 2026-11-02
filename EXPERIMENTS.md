@@ -54,3 +54,10 @@ The settlement gain is not stable across the two periods, so it stays out of the
 
 Same three regions, on the 48,899 rows both models cover: Quartz on 48 h ICON MAE 11.1%, bias +7.2%; Penumbra 4.14%.
 Band coverage falls short of the 80% target when a region supplies no outcomes, so the site reports this figure.
+
+## Monthly coverage of the 80% band, Belgium, test window
+Penumbra 72.5% to 85.4%, lowest in January; Elia 73.5% to 93.2%.
+
+## Forward check after the test
+Backfilled days since Elia's new datasets, 2026-10-26, 10-27, 11-01, 11-02, Belgium: Penumbra pinball 0.0081, Elia 0.0096; coverage 68% and 86%; band 7.9% and 12.5%.
+Four autumn days are too few to judge, so the live ledger decides whether coverage holds.
