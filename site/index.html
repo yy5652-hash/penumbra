@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A free solar forecast with calibrated uncertainty, a risk slider and an inspectable public ledger. No account needed.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://previous-runs-api.open-meteo.com https://geocoding-api.open-meteo.com; img-src 'self' data:; object-src 'none'; base-uri 'self'">
+<title>Penumbra — Solar, with a margin.</title>
+<link rel="icon" href="data:,"><link rel="stylesheet" href="vendor/uPlot.min.css"><link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to forecast</a>
+<header class="masthead wrap"><a class="brand" href="index.html" aria-label="Penumbra home"><span class="mark" aria-hidden="true"></span>penumbra<span class="brand-note">SOLAR FORECASTS</span></a><nav aria-label="Main"><a href="#ledger">Ledger</a><a href="#evidence">Evidence</a><a href="how.html">How it works</a></nav></header>
+<main id="main" class="wrap">
+<section id="forecast" class="forecast-section" aria-labelledby="forecast-heading">
+<div class="section-top"><div><p class="eyebrow">01 / FORECAST TOOL</p><h1 id="forecast-heading">Tomorrow, with a margin.</h1><p class="intro">Solar power forecasts that show the uncertainty. No account. No API key.</p></div><span class="tag">Free · Runs in your browser</span></div>
+<div class="instrument">
+<aside class="controls">
+<form id="search-form"><label for="place">Find a place</label><div class="input-action"><input id="place" type="search" placeholder="City or postal code" autocomplete="off" minlength="2" required><button type="submit">Search</button></div></form>
+<div id="search-results" aria-live="polite"></div>
+<button id="locate" class="secondary full" type="button">Use my location</button>
+<form id="forecast-form">
+<fieldset><legend>Or enter coordinates</legend><div class="pair"><div><label for="latitude">Latitude</label><input id="latitude" type="number" min="-90" max="90" step="any" value="50.85" required></div><div><label for="longitude">Longitude</label><input id="longitude" type="number" min="-180" max="180" step="any" value="4.37" required></div></div></fieldset>
+<label for="capacity">Installed capacity</label><div class="capacity-input"><input id="capacity" type="number" min="0.001" max="1000000000" step="any" value="5" required><label class="sr-only" for="unit">Capacity unit</label><select id="unit"><option value="kW">kW</option><option value="MW">MW</option></select></div>
+<p class="fine">Assumes a typical fleet mix. Tilt and orientation are not modelled.</p>
+<button class="full" type="submit" id="run">Forecast tomorrow</button>
+</form>
+<p id="location-name" class="location-name">Brussels, Belgium · example location</p>
+<p class="fine">Coordinates go directly to Open-Meteo. Nothing goes to us. <a href="terms.html">Privacy</a></p>
+</aside>
+<div class="output">
+<div class="output-top"><div><p class="eyebrow">NEXT-DAY OUTLOOK</p><h2 id="result-title">Brussels, Belgium</h2><p id="result-date" class="fine">Tomorrow · local time</p></div><span id="model-version" class="tag">Weather-only model</span></div>
+<div class="status-row"><p id="forecast-status" role="status" aria-live="polite">Preparing your forecast…</p><button id="retry" class="secondary" type="button" hidden>Retry forecast</button></div>
+<p id="region-notice" class="notice" hidden>This model was trained in Belgium and tested in Great Britain. Treat results elsewhere as a first estimate.</p>
+<div id="forecast-result" hidden>
+<div class="totals" aria-label="Daily energy estimates"><div><span>P10 / LOWER</span><strong id="total-low">—</strong></div><div class="median"><span>P50 / CENTRAL</span><strong id="total-mid">—</strong></div><div><span>P90 / UPPER</span><strong id="total-high">—</strong></div></div>
+<div class="legend" aria-hidden="true"><span class="key band">P10–P90 band</span><span class="key line">P50</span><span class="key dashed">Commitment</span></div>
+<div id="forecast-chart" class="chart" role="img" aria-labelledby="forecast-summary"></div><p id="forecast-summary" class="fine"></p>
+<div class="risk"><div class="risk-heading"><label for="risk">How sure do you need to be?</label><output id="risk-value" for="risk">90%</output></div><input id="risk" type="range" min="50" max="90" step="1" value="90"><div class="range-labels"><span>50% · more power</span><span>90% · more margin</span></div><p id="commitment" class="commitment" aria-live="polite"></p><p class="fine">A marginal confidence level for each quarter-hour, not a guarantee for the entire day. Daily totals sum quarter-hour quantiles; they are not calibrated daily energy quantiles. GB coverage was 75.4% for a nominal 80% band.</p></div>
+<div class="actions"><button id="csv" type="button" class="secondary">Download CSV</button><button id="json" type="button" class="secondary">Download JSON</button><button id="share" type="button" class="secondary">Copy share link</button></div><p id="share-status" role="status" class="fine"></p>
+<details><summary>Hourly values <span class="fine">· local time, average power</span></summary><div class="table-scroll"><table id="hourly-table"><caption class="sr-only">Hourly average power, including overnight zeros. UTC offsets distinguish repeated daylight-saving hours.</caption><thead><tr><th scope="col">Hour</th><th scope="col">P10</th><th scope="col">P50</th><th scope="col">P90</th><th scope="col">Commit</th></tr></thead><tbody></tbody></table></div></details>
+</div>
+</div></div>
+<p class="below-tool">Read the range, not just the line. P10 is the lower estimate; P90 is the upper. <a href="how.html">Understand the method →</a></p>
+</section>
+<section id="ledger" class="section" aria-labelledby="ledger-heading"><div class="section-top"><div><p class="eyebrow">02 / PUBLIC LEDGER</p><h2 id="ledger-heading">A forecast you can look back at.</h2><p>Published forecasts, their issue times, and the scores that follow.</p></div><span id="chain-status" class="tag" role="status">Checking chain…</span></div>
+<p class="fine">Live forecasts are issued before the outcome. Backfills were computed afterwards from data available at their cutoff, and their totals stay separate. Elia published no 11:00 forecast for 28 to 31 October 2026, so those dates have no entry. Each file carries the hash of the one before it.</p>
+<div id="ledger-status" role="status"></div><button id="ledger-retry" class="secondary" hidden type="button">Retry ledger</button>
+<div class="panel"><div class="output-top"><div><h3>Belgium · Penumbra grid vs Elia</h3><p id="ledger-date" class="fine">Newest published forecast · share of monitored capacity</p></div></div><div class="legend" aria-hidden="true"><span class="key band">Penumbra P10–P90 / P50</span><span class="key comparison">Elia P10–P90 / P50</span></div><div id="ledger-chart" class="chart" role="img" aria-labelledby="ledger-summary"></div><p id="ledger-summary" class="fine">Loading the newest Belgian forecast.</p></div>
+<div id="ledger-totals" class="ledger-totals"></div>
+<div class="table-scroll"><table id="ledger-table"><caption>Daily Belgian daylight scores · MAE, coverage and band width are shares of capacity. Unscored days remain pending.</caption><thead><tr><th scope="col">Target / issue (UTC)</th><th scope="col">Mode</th><th scope="col">Model</th><th scope="col">Pinball ↓</th><th scope="col">MAE ↓</th><th scope="col">Cover 80</th><th scope="col">Width ↓</th></tr></thead><tbody></tbody></table></div>
+</section>
+<section id="evidence" class="section" aria-labelledby="evidence-heading"><p class="eyebrow">03 / EVIDENCE</p><h2 id="evidence-heading">Measured. Not promised.</h2><p class="section-intro">A frozen pipeline, a single held-out test, and a separate check across the Channel.</p><div id="evidence-content" aria-live="polite"><p>Loading published results…</p></div><button id="evidence-retry" class="secondary" type="button" hidden>Retry evidence</button></section>
+<section id="pricing" class="section pricing"><div><p class="eyebrow">04 / ACCESS</p><h2>Free today.</h2><p>The forecast tool, CSV and JSON exports, and the public ledger.</p></div><div><h3>Pro: API, alerts, many sites: not available yet.</h3><p>No checkout. No waiting-list promises.</p><a class="button secondary" href="https://github.com/yy5652-hash/penumbra/issues">Discuss Pro on GitHub →</a></div></section>
+</main>
+<footer class="wrap"><a class="brand" href="index.html">penumbra</a><p>Weather data by <a href="https://open-meteo.com/">Open-Meteo.com</a>, CC BY 4.0<br>Solar data: Elia Open Data · Sheffield Solar PV_Live</p><nav aria-label="Footer"><a href="how.html">Method &amp; sources</a><a href="terms.html">Terms &amp; privacy</a></nav></footer>
+<noscript><p class="wrap notice">JavaScript is needed to calculate forecasts and verify the ledger. Read <a href="how.html">the method</a> or inspect the <a href="ledger/index.json">ledger files</a>.</p></noscript>
+</body></html>
