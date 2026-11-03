@@ -61,3 +61,13 @@ Penumbra 72.5% to 85.4%, lowest in January; Elia 73.5% to 93.2%.
 ## Forward check after the test
 Backfilled days since Elia's new datasets, 2026-10-26, 10-27, 11-01, 11-02, Belgium: Penumbra pinball 0.0081, Elia 0.0096; coverage 68% and 86%; band 7.9% and 12.5%.
 Four autumn days are too few to judge, so the live ledger decides whether coverage holds.
+
+## Round 2, validation 2025-05..2025-10 (user asked to go well beyond Elia, 11-03)
+Paired daily pinball difference against Elia, Belgium; v1 frozen = -0.00065.
+| Change | Belgium diff [95% CI] | Provinces diff | Verdict |
+|---|---|---|---|
+| Season-aware calibration, 30 or 90 day windows | within 0.0001 of v1 | same | no winter in validation, no gain |
+| 5-seed bagging | -0.00071 [-0.00101, -0.00041] | -0.00067 | small |
+| D-1 morning measured vs Elia, 06-08 UTC | -0.00074 [-0.00104, -0.00044] | -0.00070 | small gain |
+| Tuned: 400 trees, lr 0.02, 15 leaves, min child 1000, colsample 0.6 | -0.00081 [-0.00110, -0.00053] | -0.00075 | best single change |
+| Fresh NWP at the cutoff: ECMWF IFS and GFS 00z of D-1 from AWS archives | pending download | | |

@@ -94,6 +94,70 @@ def weather_features(raw, lat, lon):
     return out
 
 
+def load_ecmwf(folder="data/ecmwf"):
+    files = sorted(Path(folder).glob("*.parquet"))
+    if not files:
+        return None
+    df = pd.concat([pd.read_parquet(p) for p in files], ignore_index=True)
+    return df[df.param == "ssrd"]
+
+
+def ecmwf_features(ec, place, feats):
+    """Fresh ECMWF radiation from the 00z run of D-1: 3-hour mean GHI as a clear-sky index, spread over 15 minutes.
+
+    A 15-minute row starting at t belongs to the 3-hour interval ending at floor(t, 3h) + 3h, as hourly values do above.
+    """
+    e = ec[ec.place == place].copy()
+    e["run"] = pd.to_datetime(e["run"], utc=True)
+    e = e.pivot_table(index="run", columns="step", values="box")
+    rows = []
+    for step in range(27, 46, 3):
+        if step in e.columns and step - 3 in e.columns:
+            ghi = (e[step] - e[step - 3]) / 10800
+            rows.append(pd.DataFrame({"end": e.index + pd.Timedelta(hours=step), "ghi3": ghi.values}))
+    if not rows:
+        return pd.DataFrame(index=feats.index, data={"k_ec": np.nan, "ghi_ec": np.nan})
+    g = pd.concat(rows).dropna().set_index("end").ghi3
+    g = g[~g.index.duplicated()]
+    label = feats.index.floor("3h") + pd.Timedelta(hours=3)
+    cs3 = feats["clear_sky"].groupby(label).transform("mean").values
+    ghi = g.reindex(label).values
+    with np.errstate(divide="ignore", invalid="ignore"):
+        k = np.clip(np.where(cs3 > 20, ghi / cs3, np.nan), 0, 1.5)
+    return pd.DataFrame(index=feats.index, data={"k_ec": k, "ghi_ec": k * feats["clear_sky"].values})
+
+
+def load_gfs(folder="data/gfs"):
+    files = sorted(Path(folder).glob("*.parquet"))
+    return pd.concat([pd.read_parquet(p) for p in files], ignore_index=True) if files else None
+
+
+def gfs_features(gf, place, feats):
+    """Fresh GFS from the 00z run of D-1. GFS averages restart every 6 hours, so the second 3 hours of each
+    6-hour window are 2 * mean(0-6) - mean(0-3)."""
+    out = {}
+    for param, col in (("DSWRF", "ghi3"), ("TCDC", "cloud3")):
+        e = gf[(gf.place == place) & (gf.param == param)].copy()
+        e["run"] = pd.to_datetime(e["run"], utc=True)
+        e = e.pivot_table(index="run", columns="window", values="box")
+        parts = []
+        for a in (24, 30, 36, 42):
+            first, whole = f"{a}-{a + 3}", f"{a}-{a + 6}"
+            if first in e.columns:
+                parts.append(pd.Series(e[first].values, index=e.index + pd.Timedelta(hours=a + 3)))
+                if whole in e.columns:
+                    parts.append(pd.Series((2 * e[whole] - e[first]).values, index=e.index + pd.Timedelta(hours=a + 6)))
+        v = pd.concat(parts).dropna() if parts else pd.Series(dtype=float)
+        out[col] = v[~v.index.duplicated()]
+    label = feats.index.floor("3h") + pd.Timedelta(hours=3)
+    cs3 = feats["clear_sky"].groupby(label).transform("mean").values
+    ghi = out["ghi3"].reindex(label).values
+    with np.errstate(divide="ignore", invalid="ignore"):
+        k = np.clip(np.where(cs3 > 20, ghi / cs3, np.nan), 0, 1.5)
+    return pd.DataFrame(index=feats.index, data={"k_gfs": k, "ghi_gfs": k * feats["clear_sky"].values,
+                                                 "cloud_gfs": out["cloud3"].reindex(label).values})
+
+
 def add_lags(g):
     """Lags that exist at 11:00 D-1. D-2 is the last complete day, 192 quarter-hours back."""
     g = g.sort_values("datetime").set_index("datetime")
@@ -107,6 +171,14 @@ def add_lags(g):
     err = g["cf"] - g["tso_p50"]
     g["tso_err7"] = pd.concat([err.shift(96 * k) for k in range(2, 9)], axis=1).mean(axis=1)
     g["tso_abs7"] = pd.concat([err.abs().shift(96 * k) for k in range(2, 9)], axis=1).mean(axis=1)
+    # D-1 morning, 06:00 to 08:00 UTC: measured before the cutoff (09:00 UTC in summer, 10:00 in winter).
+    morning = (g.index.hour >= 6) & (g.index.hour < 8)
+    day_cf = g["cf"].where(morning).resample("D").sum(min_count=4)
+    day_tso = g["tso_p50"].where(morning).resample("D").sum(min_count=4)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = (day_cf / day_tso.where(day_tso > 0.02)).shift(1)
+    g["m_ratio1"] = ratio.reindex(g.index.floor("D")).values
+    g["m_err1"] = ((day_cf - day_tso) / 8).shift(1).reindex(g.index.floor("D")).values
     return g.reset_index()
 
 
@@ -120,9 +192,14 @@ def build(out=OUT, live=False):
         elia = pd.concat([elia[elia.datetime < new.datetime.min()], new], ignore_index=True)
     elia = elia[elia.region.isin(PROVINCES + ["Belgium"])].drop_duplicates(["datetime", "region"])
     weather = load_weather(live)
+    ec, gf = load_ecmwf(), load_gfs()
     parts = {}
     for name, (lat, lon) in PLACES.items():
         parts[name] = weather_features(weather[weather.region == name], lat, lon)
+        if ec is not None:
+            parts[name] = parts[name].join(ecmwf_features(ec, name, parts[name]))
+        if gf is not None:
+            parts[name] = parts[name].join(gfs_features(gf, name, parts[name]))
     caps = elia[elia.region.isin(PROVINCES)].groupby("region").monitoredcapacity.last()
     weights = caps / caps.sum()
     frames = [parts[n].mul(weights[n]) for n in PROVINCES]

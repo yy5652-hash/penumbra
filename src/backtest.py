@@ -57,7 +57,7 @@ def fit_predict(table, feats, start, end, base=None, params=PARAMS):
     return pd.concat(out, ignore_index=True)
 
 
-def conformalize(df, days=CAL_DAYS, scoped=False):
+def conformalize(df, days=CAL_DAYS, scoped=False, season=False):
     """Asymmetric rolling CQR. For each day, shift P10 and P90 by trailing out-of-sample errors in the same
     width and solar-height bucket, using only outcomes known by the end of D-2."""
     df = df.sort_values("datetime").reset_index(drop=True)
@@ -65,6 +65,8 @@ def conformalize(df, days=CAL_DAYS, scoped=False):
     df["bin"] = (df.elevation > 15).astype(int) * 3 + np.digitize(df.w, [0.05, 0.15])
     if scoped:
         df["bin"] += 6 * (df.region == "Belgium").astype(int)
+    if season:  # November to February get their own shifts
+        df["bin"] += 12 * df.datetime.dt.month.isin([11, 12, 1, 2]).astype(int)
     df["lo_err"] = df.p10 - df.cf
     df["hi_err"] = df.cf - df.p90
     df["p10c"], df["p90c"] = df.p10, df.p90
