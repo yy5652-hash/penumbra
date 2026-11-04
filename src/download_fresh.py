@@ -3,6 +3,6 @@ import download_ecmwf
 import download_gfs
 
 if __name__ == "__main__":
-    download_gfs.main("2024-06-01")
     download_ecmwf.main("2024-06-01")
+    download_gfs.main("2021-01-01")
     print("all done", flush=True)

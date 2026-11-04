@@ -1,4 +1,4 @@
-"""Fetch ECMWF IFS open-data 00z runs from the AWS archive, keeping only the grid points around each place.
+"""Fetch ECMWF IFS open-data 00z runs from the public archive (Google Cloud copy of the AWS bucket), keeping only the grid points around each place.
 
 The 00z run of D-1 is on the archive by about 07:34 UTC in winter and 08:34 UTC in summer, before Elia's 11:00
 Brussels cutoff (09:00 or 10:00 UTC). Steps 24 to 45 cover the daylight of day D. Only the byte ranges of the needed fields are read,
@@ -9,6 +9,7 @@ Usage: download_ecmwf.py [first_run_date] [last_run_date] [places]   places: be 
 import json
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import eccodes
@@ -18,19 +19,20 @@ import requests
 
 from download_weather import PLACES
 
-BASE = "https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com"
+BASE = "https://storage.googleapis.com/ecmwf-open-data"  # same files as the AWS archive, without its request cap
 STEPS = list(range(24, 46, 3))  # 00 to 21 UTC on day D
 PARAMS = ["ssrd"]
 
 
 LAST = [0.0]
+PACE = 0.05
 
 
 def get(url, headers=None):
-    """The bucket allows about 1.5 requests a second from one client and answers more with SlowDown, sometimes
-    inside a 200 reply. Throttled requests also count, so pace every request instead of retrying fast."""
+    """The AWS copy caps one client near 1.5 requests a second and answers SlowDown, sometimes inside a 200 reply,
+    so a reply that is XML is retried, and requests keep a small gap."""
     for attempt in range(20):
-        wait = LAST[0] + 0.7 - time.time()
+        wait = LAST[0] + PACE - time.time()
         if wait > 0:
             time.sleep(wait)
         LAST[0] = time.time()
@@ -119,10 +121,10 @@ def main(first="2024-06-01", last=None, which="be"):
     root.mkdir(parents=True, exist_ok=True)
     pts = points(places)
     runs = pd.date_range(first, last, freq="D")
-    for run in runs:
-        msg = fetch_run(run, pts, root)
-        if msg != "skip":
-            print(f"{run:%Y-%m-%d} {msg}", flush=True)
+    with ThreadPoolExecutor(4) as pool:
+        for run, msg in zip(runs, pool.map(lambda r: fetch_run(r, pts, root), runs)):
+            if msg != "skip":
+                print(f"{run:%Y-%m-%d} {msg}", flush=True)
 
 
 if __name__ == "__main__":

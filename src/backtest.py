@@ -36,12 +36,14 @@ def pinball(y, q, a):
     return np.maximum(a * d, (a - 1) * d)
 
 
-def fit_predict(table, feats, start, end, base=None, params=PARAMS):
+def fit_predict(table, feats, start, end, base=None, params=PARAMS, history_days=None):
     """One model per month, fitted only on rows before that month. With base, learn quantiles of the residual."""
     out = []
     for month in pd.date_range(start, end, freq="MS", tz="UTC"):
         nxt = month + pd.offsets.MonthBegin(1)
         tr = table[table.datetime < month - pd.Timedelta(days=2)]
+        if history_days:
+            tr = tr[tr.datetime >= month - pd.Timedelta(days=history_days)]
         te = table[(table.datetime >= month) & (table.datetime < nxt)]
         if te.empty:
             continue

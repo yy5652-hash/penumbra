@@ -99,7 +99,9 @@ def load_ecmwf(folder="data/ecmwf"):
     if not files:
         return None
     df = pd.concat([pd.read_parquet(p) for p in files], ignore_index=True)
-    return df[df.param == "ssrd"]
+    df = df[df.param == "ssrd"].copy()
+    df["box"] = df["box"].astype(float)  # an empty run file turns the column into objects
+    return df
 
 
 def ecmwf_features(ec, place, feats):
@@ -120,8 +122,8 @@ def ecmwf_features(ec, place, feats):
     g = pd.concat(rows).dropna().set_index("end").ghi3
     g = g[~g.index.duplicated()]
     label = feats.index.floor("3h") + pd.Timedelta(hours=3)
-    cs3 = feats["clear_sky"].groupby(label).transform("mean").values
-    ghi = g.reindex(label).values
+    cs3 = feats["clear_sky"].groupby(label).transform("mean").to_numpy(dtype=float)
+    ghi = g.reindex(label).to_numpy(dtype=float)
     with np.errstate(divide="ignore", invalid="ignore"):
         k = np.clip(np.where(cs3 > 20, ghi / cs3, np.nan), 0, 1.5)
     return pd.DataFrame(index=feats.index, data={"k_ec": k, "ghi_ec": k * feats["clear_sky"].values})
@@ -129,7 +131,11 @@ def ecmwf_features(ec, place, feats):
 
 def load_gfs(folder="data/gfs"):
     files = sorted(Path(folder).glob("*.parquet"))
-    return pd.concat([pd.read_parquet(p) for p in files], ignore_index=True) if files else None
+    if not files:
+        return None
+    df = pd.concat([pd.read_parquet(p) for p in files], ignore_index=True)
+    df["box"] = df["box"].astype(float)
+    return df
 
 
 def gfs_features(gf, place, feats):
@@ -150,8 +156,8 @@ def gfs_features(gf, place, feats):
         v = pd.concat(parts).dropna() if parts else pd.Series(dtype=float)
         out[col] = v[~v.index.duplicated()]
     label = feats.index.floor("3h") + pd.Timedelta(hours=3)
-    cs3 = feats["clear_sky"].groupby(label).transform("mean").values
-    ghi = out["ghi3"].reindex(label).values
+    cs3 = feats["clear_sky"].groupby(label).transform("mean").to_numpy(dtype=float)
+    ghi = out["ghi3"].reindex(label).to_numpy(dtype=float)
     with np.errstate(divide="ignore", invalid="ignore"):
         k = np.clip(np.where(cs3 > 20, ghi / cs3, np.nan), 0, 1.5)
     return pd.DataFrame(index=feats.index, data={"k_gfs": k, "ghi_gfs": k * feats["clear_sky"].values,
@@ -182,9 +188,19 @@ def add_lags(g):
     return g.reset_index()
 
 
-def build(out=OUT, live=False):
-    """With live, append the datasets Elia started on 2026-10-26 and keep rows whose outcome is not known yet."""
+def geometry(idx, lat, lon):
+    el, az = solar_position(idx, lat, lon)
+    doy = idx.dayofyear.values
+    return pd.DataFrame({"elevation": el, "azimuth": az, "clear_sky": clear_sky_ghi(el),
+                         "doy_sin": np.sin(2 * np.pi * doy / 365.25), "doy_cos": np.cos(2 * np.pi * doy / 365.25)}, index=idx)
+
+
+def build(out=OUT, live=False, extended=False):
+    """With live, append the datasets Elia started on 2026-10-26 and keep rows whose outcome is not known yet.
+    With extended, start in 2021: rows before the 48 h archive (2024) carry only geometry and fresh GFS."""
     elia = pd.read_parquet("data/raw/elia_ods032.parquet")
+    if extended:
+        elia = pd.concat([pd.read_parquet("data/raw/elia_ods032_hist.parquet"), elia], ignore_index=True)
     elia["datetime"] = pd.to_datetime(elia["datetime"], utc=True).astype("datetime64[ns, UTC]")
     if live:
         new = pd.read_parquet("data/raw/elia_live.parquet")
@@ -196,6 +212,10 @@ def build(out=OUT, live=False):
     parts = {}
     for name, (lat, lon) in PLACES.items():
         parts[name] = weather_features(weather[weather.region == name], lat, lon)
+        if extended:
+            idx = pd.date_range(elia.datetime.min(), parts[name].index.max(), freq="15min", tz="UTC")
+            nwp = parts[name].drop(columns=["elevation", "azimuth", "clear_sky", "doy_sin", "doy_cos"])
+            parts[name] = geometry(idx, lat, lon).join(nwp)
         if ec is not None:
             parts[name] = parts[name].join(ecmwf_features(ec, name, parts[name]))
         if gf is not None:
@@ -216,8 +236,20 @@ def build(out=OUT, live=False):
             t[dst] = t[src] / t["monitoredcapacity"]
         tables.append(add_lags(t).assign(region=name))
     table = pd.concat(tables, ignore_index=True)
-    table = table[(table.elevation > 0) & table.k_mean.notna() & (live | table.cf.notna())]
+    weather_ok = table.k_mean.notna()
+    if extended:
+        weather_ok |= table.get("k_gfs", pd.Series(np.nan, index=table.index)).notna()
+    table = table[(table.elevation > 0) & weather_ok & (live | table.cf.notna())]
     table["date"] = table.datetime.dt.floor("D")
+    # Where the weather disagrees with Elia's median: the residual model's most direct signal.
+    cs = table["clear_sky"] / 1000
+    with np.errstate(divide="ignore", invalid="ignore"):
+        table["tso_k"] = np.where(cs > 0.02, table["tso_p50"] / cs, np.nan)
+    table["gap_d2"] = table["ghi_mean"] / 1000 - table["tso_p50"]
+    for src in ("gfs", "ec"):
+        if f"ghi_{src}" in table:
+            table[f"gap_{src}"] = table[f"ghi_{src}"] / 1000 - table["tso_p50"]
+            table[f"kdiff_{src}"] = table[f"k_{src}"] - table["tso_k"]
     table.to_parquet(out)
     print(table.shape, table.datetime.min(), table.datetime.max())
     print(table.groupby("region").cf.agg(["count", "mean", "max"]).round(3))
@@ -225,4 +257,8 @@ def build(out=OUT, live=False):
 
 
 if __name__ == "__main__":
-    build()
+    import sys
+    if sys.argv[1:] == ["extended"]:
+        build(Path("data/table_v2.parquet"), extended=True)
+    else:
+        build()

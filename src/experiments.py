@@ -23,6 +23,12 @@ VARIANTS = {
                               "min_child_samples": 1000, "colsample_bytree": 0.6}),
     "res_morning": dict(feats=FEATURES["grid"] + ["tso_err7", "tso_abs7", "m_ratio1", "m_err1"], base="tso_p50", params=SMALL),
     "res_tm": dict(feats=FEATURES["grid"] + ["tso_err7", "tso_abs7", "m_ratio1", "m_err1"], base="tso_p50", params=TUNED),
+    "res_gfs": dict(feats=FEATURES["grid"] + ["tso_err7", "tso_abs7", "m_ratio1", "m_err1", "k_gfs", "ghi_gfs", "cloud_gfs"],
+                    base="tso_p50", params=TUNED),
+    "res_gap": dict(feats=FEATURES["grid"] + ["tso_err7", "tso_abs7", "m_ratio1", "m_err1", "k_gfs", "ghi_gfs", "cloud_gfs",
+                                               "tso_k", "gap_d2", "gap_gfs", "kdiff_gfs"], base="tso_p50", params=TUNED),
+    "res_gap_240d": dict(feats=FEATURES["grid"] + ["tso_err7", "tso_abs7", "m_ratio1", "m_err1", "k_gfs", "ghi_gfs", "cloud_gfs",
+                                                    "tso_k", "gap_d2", "gap_gfs", "kdiff_gfs"], base="tso_p50", params=TUNED, history_days=240),
     "res_fresh": dict(feats=FEATURES["grid"] + ["tso_err7", "tso_abs7", "m_ratio1", "m_err1", "k_ec", "ghi_ec", "k_gfs", "ghi_gfs", "cloud_gfs"],
                       base="tso_p50", params=TUNED),
     "res_bag": dict(feats=FEATURES["grid"] + ["tso_err7", "tso_abs7"], base="tso_p50", params=SMALL, seeds=[1, 2, 3, 4, 5]),
@@ -33,9 +39,9 @@ OUT = Path("data/results/exp")
 def raw(name):
     path = OUT / f"{name}.parquet"
     if not path.exists():
-        table = pd.read_parquet("data/table.parquet").dropna(subset=TSO)
-        table = table[table.datetime < pd.Timestamp(END, tz="UTC") + pd.Timedelta(days=1)]
         spec = dict(VARIANTS[name])
+        table = pd.read_parquet(spec.pop("table", "data/table.parquet")).dropna(subset=TSO)
+        table = table[table.datetime < pd.Timestamp(END, tz="UTC") + pd.Timedelta(days=1)]
         seeds = spec.pop("seeds", None)
         if seeds:  # average the raw quantiles of several seeds, then re-sort
             runs = [fit_predict(table, start=FIRST_OOS, end=END, **{**spec, "params": {**spec["params"], "random_state": s}}) for s in seeds]
