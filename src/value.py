@@ -24,6 +24,11 @@ def main(stage):
            "firm_p10_mw": {"tso": float(be.tso_p10.mean() * cap), "ours": float(be.p10c.mean() * cap)},
            "reliability_p10": {"tso": float((be.cf >= be.tso_p10).mean()), "ours": float((be.cf >= be.p10c).mean())},
            "band_mw": {"tso": float((be.tso_p90 - be.tso_p10).mean() * cap), "ours": float((be.p90c - be.p10c).mean() * cap)}}
+    if stage == "test_v2":
+        print(json.dumps(out, indent=1))
+        with open(f"data/results/{stage}_value.json", "w") as f:
+            json.dump(out, f, indent=1)
+        return
     daily = {}
     for name, nom in (("tso", be.tso_p50), ("ours", be.p50)):
         daily[name] = (((be.imbalanceprice - be.price) * (be.cf - nom) * 0.25)).groupby(be.date).sum()

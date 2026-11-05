@@ -96,15 +96,18 @@ export function quantileAt(p10,p50,p90,q) {
 }
 /** Hash the original UTF-8 bytes, never a re-serialized JSON object. */
 export async function verifyChain(files) {
-  let previous=null, lastDate='';
+  // Files come in issue order. The first has no predecessor; every later file must point at a file issued before it,
+  // so changing, removing or reordering any file breaks a link.
+  const seen=new Set(); let previous=null;
   for (let i=0; i<files.length; i++) {
     const {date,text}=files[i];
     try {
       const doc=JSON.parse(text);
-      if (date<=lastDate || doc.target_date!==date || doc.prev_sha256!==previous) return {ok:false,count:i,brokenDate:date};
+      const linked=i===0 ? doc.prev_sha256===null : seen.has(doc.prev_sha256);
+      if (doc.target_date!==date || !linked) return {ok:false,count:i,brokenDate:date};
       const digest=await globalThis.crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
       previous=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
-      lastDate=date;
+      seen.add(previous);
     } catch { return {ok:false,count:i,brokenDate:date}; }
   }
   return {ok:true,count:files.length,head:previous};

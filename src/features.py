@@ -1,7 +1,8 @@
 """Build the 15-minute modelling table from Elia PV data and archived NWP.
 
 Every feature is available at the 11:00 D-1 cutoff of the TSO day-ahead forecast:
-weather comes from runs at least 48 h old and lags stop at the end of D-2.
+weather combines runs at least 48 h old with fresh GFS 00z of D-1.
+Output lags stop at D-2, with D-1 morning measurements available before the cutoff.
 """
 from pathlib import Path
 

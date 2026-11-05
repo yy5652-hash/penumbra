@@ -16,7 +16,7 @@ import requests
 from backtest import FROZEN, QUANTILES, TSO
 from download_weather import MODELS as NWP, URL, VARS
 from features import weather_features
-from live import MODELS, read_ledger
+from live import MODELS, chain_order, read_ledger
 
 SITE = Path("site")
 FIXTURE_PLACES = {"cambridge": (52.2, 0.12), "brussels": (50.85, 4.37), "lisbon": (38.72, -9.14)}
@@ -125,7 +125,7 @@ def fixtures(month, sh):
             "lat": lat, "lon": lon, "open_meteo": body, "times": feats.index.strftime("%Y-%m-%dT%H:%MZ").tolist(),
             "features": {n: [None if np.isnan(v) else float(v) for v in feats[n]] for n in names},
             "raw": {"p10": pr[:, 0].tolist(), "p50": pr[:, 1].tolist(), "p90": pr[:, 2].tolist()},
-            "p10": p10c.tolist(), "p90": p90c.tolist()}, separators=(",", ":")))
+            "p10": p10c.tolist(), "p90": p90c.tolist(), "shifts": sh}, separators=(",", ":")))
         print(name, len(feats), "rows")
 
 
@@ -134,7 +134,8 @@ def copy_ledger():
     target.mkdir(parents=True, exist_ok=True)
     for path in Path("ledger").glob("*.json"):
         shutil.copy(path, target / path.name)
-    days = sorted(p.stem for p in Path("ledger").glob("20*.json"))
+    # The hash chain follows issue order: a day Elia published late is issued, and linked, after newer days.
+    days = [p.stem for p in chain_order()]
     (target / "index.json").write_text(json.dumps({"days": days}))
 
 

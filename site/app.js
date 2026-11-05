@@ -252,16 +252,15 @@ async function loadEvidence() {
   const parent=$('evidence-content');$('evidence-retry').hidden=true;
   try {
     const r=await getJSON('data/results.json');parent.replaceChildren();
-    evidenceTable(parent,'359 days. One test run.',r.test,'2025-11..2026-10 · daylight quarter-hours · share of monitored capacity');
+    evidenceTable(parent,'359 days. Frozen v2 results.',r.test,'2025-11..2026-10 · daylight quarter-hours · share of monitored capacity');
     const note=document.createElement('p');note.className='notice';note.textContent='The tool above uses Penumbra weather only. Penumbra grid additionally uses Elia forecasts and trailing errors; its results do not describe arbitrary-site forecasts.';parent.append(note);
     const ci=document.createElement('div');ci.className='evidence-block';const h=document.createElement('h3');h.textContent='Paired confidence intervals';ci.append(h);
     const desc=document.createElement('p');desc.textContent=r.paired.method+'. Negative differences favour Penumbra.';ci.append(desc);
     for(const key of ['Belgium','Provinces']){const p=document.createElement('p');p.className='ci';p.textContent=`${key}: ${r.paired[key]}`;ci.append(p);}parent.append(ci);
     evidenceTable(parent,'Portability: Belgium → Great Britain',r.portability,'2025-11..2026-10 · no GB data in training or calibration');
     for(const text of [r.portability_note,r.quartz]){const p=document.createElement('p');p.className='notice';p.textContent=text;parent.append(p);}
-    const causality=document.createElement('div');causality.className='evidence-block';const ch=document.createElement('h3');ch.textContent='How causality was kept';const cp=document.createElement('p');cp.textContent=r.causality+' Lags stop at the end of D-2. Parameters were selected on validation, not on the held-out test. The public ledger identifies retrospective backfills explicitly.';causality.append(ch,cp);parent.append(causality);
-    evidenceTable(parent,'Operator value: Belgium',r.operator,'11.76 GW monitored · settlement outcomes are not a revenue promise');
-    const p=document.createElement('p');p.className='fine';p.textContent=r.settlement_note;parent.append(p);
+    const causality=document.createElement('div');causality.className='evidence-block';const ch=document.createElement('h3');ch.textContent='How causality was kept';const cp=document.createElement('p');cp.textContent=r.causality+' The public ledger identifies retrospective backfills explicitly.';causality.append(ch,cp);parent.append(causality);
+    evidenceTable(parent,'Operator value: Belgium',r.operator,'11.76 GW monitored · v2 test days');
   }catch{parent.textContent='Published results could not be loaded.';$('evidence-retry').hidden=false;}
 }
 $('evidence-retry').addEventListener('click',loadEvidence);

@@ -7,7 +7,7 @@ const model=await read('../model/weather.json'), shifts=await read('../data/shif
 const close=(a,b,label)=>{ if(b===null) assert.ok(Number.isNaN(a),label); else assert.ok(Number.isFinite(a)&&Math.abs(a-b)<=1e-4,`${label}: ${a} vs ${b}`); };
 for (const file of (await readdir(new URL('fixtures/',import.meta.url))).sort()) {
   test(`Python parity: ${file}`,async()=>{
-    const f=await read(`fixtures/${file}`), rows=forecast(f.open_meteo,f.lat,f.lon,model,shifts);
+    const f=await read(`fixtures/${file}`), rows=forecast(f.open_meteo,f.lat,f.lon,model,f.shifts??shifts);
     assert.deepEqual(rows.map(r=>r.time),f.times);
     rows.forEach((r,i)=>{
       for(const n of model.features) close(r[n],f.features[n][i],`${file} ${i} ${n}`);
