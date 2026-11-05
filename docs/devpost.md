@@ -27,7 +27,7 @@ Python, pandas, LightGBM, rolling conformal quantile calibration. A static site 
 - Parity tests confirm that the browser matches Python to 0.0001 on real weather responses.
 
 ## Results and validation
-Inputs include four weather models from runs at least 48 hours old, fresh GFS 00z of D-1 from the NOAA archive, and D-1 morning measured output before the 11:00 cutoff. Training history starts in 2021. Other output lags stop at D-2. Choices were made on May to October 2025. Scores cover 359 test days, November 2025 to October 2026. The test window was used twice: first by v1, then by v2, which was chosen on validation and frozen in 16e4605 before its single run. The first frozen version was v1 (`b1ed71c`).
+Inputs include four weather models from runs at least 48 hours old, fresh GFS 00z of D-1 from the NOAA archive, and D-1 morning measured output before the 11:00 cutoff. Training history starts in 2021. Other output lags stop at D-2. Choices were made on May to October 2025. Scores cover 359 test days, November 2025 to October 2026. The test window was used twice: first by v1, then by v2, which was chosen on validation and frozen in 6e8d5b8 before its single run. The first frozen version was v1 (`2d11d22`).
 
 | Method | Scope | Pinball | MAE | 80% coverage | Band width |
 |---|---|---|---|---|---|

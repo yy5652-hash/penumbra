@@ -83,7 +83,7 @@ s.addNotes("We do not re-forecast the weather. We use what the operator already 
 // 4
 s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Solution" });
 s.addText("Every v2 input existed at the 11:00 cutoff", { placeholder: "title" });
-const flow = [["History from 2021", "Training start", "Public data only"], ["2025-05 to 2025-10", "Validation", "v2 choices made here"], ["Commit 16e4605", "Freeze", "Pipeline committed before the test"], ["2025-11 to 2026-10", "v2 test, one run", "359 days, chosen on validation"], ["From 2026-11-04", "Live ledger", "Issued before the outcome"]];
+const flow = [["History from 2021", "Training start", "Public data only"], ["2025-05 to 2025-10", "Validation", "v2 choices made here"], ["Commit 6e8d5b8", "Freeze", "Pipeline committed before the test"], ["2025-11 to 2026-10", "v2 test, one run", "359 days, chosen on validation"], ["From 2026-11-04", "Live ledger", "Issued before the outcome"]];
 s.addShape(pres.ShapeType.line, { x: 1.0, y: 2.25, w: 11.3, h: 0, line: { color: C.accent2, width: 2 }, objectName: "Timeline" });
 flow.forEach(([d, h, b], i) => {
   const x = 0.6 + i * 2.45;
@@ -99,7 +99,7 @@ text(s, [
   { text: "Models refit monthly with a 2-day gap; calibration uses outcomes known by D-2", options: { bullet: { indent: 14 }, breakLine: true } },
   { text: "Significance: paired daily differences, 2,000 block bootstrap draws", options: { bullet: { indent: 14 } } },
 ], { x: 0.9, y: 4.42, w: 11.5, h: 2.0, fontSize: 16, paraSpaceAfter: 6, objectName: "Causality points" });
-s.addNotes("The test window was used twice: first by v1, then by v2, which was chosen on validation and frozen in 16e4605 before its single run. The first frozen version was v1 (b1ed71c).");
+s.addNotes("The test window was used twice: first by v1, then by v2, which was chosen on validation and frozen in 6e8d5b8 before its single run. The first frozen version was v1 (2d11d22).");
 
 // 5
 pres.addSection({ title: "Results" });

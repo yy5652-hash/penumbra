@@ -1,7 +1,7 @@
 # Experiments
 
 All scores are on daylight quarter-hours, as a share of monitored capacity. Weather is at least 48 h old at the
-11:00 D-1 cutoff. Only the pipeline frozen in commit b1ed71c ran on the test window, and it ran once.
+11:00 D-1 cutoff. Only the pipeline frozen in commit 2d11d22 ran on the test window, and it ran once.
 
 ## Validation, 2025-05..2025-10 (184 days)
 | Change | Scope | Pinball | MAE | Cover 80 | Width | Verdict |
@@ -81,8 +81,8 @@ Same 119,958 validation rows for every variant, share of Elia's pinball (Belgium
 v1 -6.0% / -5.0%; gaps -7.8% / -6.0%; + ECMWF -8.1% / -6.1%; history from 2021 -9.1% / -7.4% (MAE 3.10% vs Elia 3.28%);
 average of the last two -9.0% / -7.2%. Coverage of the 80% band 78% to 79% for all round-2 variants.
 
-## Test v2, 2025-11..2026-10 (359 days), single run of the pipeline frozen in 16e4605
-The test window was first used by v1 (b1ed71c). v2 was chosen on validation only and frozen before this run.
+## Test v2, 2025-11..2026-10 (359 days), single run of the pipeline frozen in 6e8d5b8
+The test window was first used by v1 (2d11d22). v2 was chosen on validation only and frozen before this run.
 Rows come from the extended table, so Elia's own scores differ slightly from the v1 table.
 | Method | Scope | Pinball | MAE | Cover 80 | Width |
 |---|---|---|---|---|---|

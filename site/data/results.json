@@ -89,7 +89,7 @@
     "Provinces": "-0.00112 [-0.00135, -0.00090]"
   },
   "quartz": "Same three regions, on the 48,899 rows both models cover: Quartz on 48 h ICON MAE 11.1%, bias +7.2%; Penumbra 4.14%.",
-  "causality": "Scores cover daylight quarter-hours as a share of monitored capacity. Inputs include four weather models from runs at least 48 hours old, fresh GFS 00z of D-1 from the NOAA archive, and D-1 morning measured output before the 11:00 cutoff. Training history starts in 2021. Other output lags stop at D-2. The test window was used twice: first by v1, then by v2, which was chosen on validation and frozen in 16e4605 before its single run. The first frozen version was v1 (b1ed71c).",
+  "causality": "Scores cover daylight quarter-hours as a share of monitored capacity. Inputs include four weather models from runs at least 48 hours old, fresh GFS 00z of D-1 from the NOAA archive, and D-1 morning measured output before the 11:00 cutoff. Training history starts in 2021. Other output lags stop at D-2. The test window was used twice: first by v1, then by v2, which was chosen on validation and frozen in 6e8d5b8 before its single run. The first frozen version was v1 (2d11d22).",
   "portability_note": "Belgium-trained, no GB data in training or calibration, 2025-11..2026-10. Band coverage falls short of the 80% target when a region supplies no outcomes.",
   "operator": {
     "headers": [
