@@ -1,5 +1,5 @@
 import uPlot from './vendor/uPlot.esm.js';
-import {forecast,quantileAt,verifyChain,MODELS} from './forecast.js';
+import {forecast,adjustOrientation,quantileAt,verifyChain,MODELS} from './forecast.js';
 const $=id=>document.getElementById(id);
 const WEATHER='https://previous-runs-api.open-meteo.com/v1/forecast';
 const GEOCODE='https://geocoding-api.open-meteo.com/v1/search';
@@ -33,8 +33,10 @@ function model(horizon) {
   }
   return modelPromises.get(horizon);
 }
+const geometry=()=>({tilt:$('tilt').value===''?35:Number($('tilt').value),azimuth:Number($('azimuth').value)});
 function setHash() {
   const p=new URLSearchParams({lat:location.latitude,lon:location.longitude,capacity:$('capacity').value,unit:$('unit').value,risk:$('risk').value,horizon:$('horizon').value,name:location.name});
+  for(const [key,value] of Object.entries(geometry()))p.set(key,value);
   if(location.timezone) p.set('tz',location.timezone);
   history.replaceState(null,'',`#${p}`);
 }
@@ -48,6 +50,10 @@ function restoreHash() {
     location={latitude:lat,longitude:lon,name:(p.get('name')||'Selected coordinates').slice(0,150),timezone};
     $('latitude').value=lat; $('longitude').value=lon; $('capacity').value=cap; $('unit').value=p.get('unit')==='MW'?'MW':'kW'; $('risk').value=risk;
     $('horizon').value=['1','2','3'].includes(p.get('horizon'))?p.get('horizon'):'1';
+    const tilt=p.get('tilt');
+    $('tilt').value=tilt!==null&&tilt.trim()!==''&&Number.isFinite(Number(tilt))&&Number(tilt)>=0&&Number(tilt)<=90?tilt:'35';
+    $('azimuth').value=[...$('azimuth').options].some(o=>o.value===p.get('azimuth'))?p.get('azimuth'):'180';
+    if(geometry().tilt!==35||geometry().azimuth!==180)$('tilt').closest('details').open=true;
     return true;
   } catch { return false; }
 }
@@ -148,9 +154,11 @@ function chart(target,data,series,bands,tz,unit) {
   return new uPlot({width:Math.max(240,target.clientWidth),height:260,legend:{show:false},cursor:{drag:{x:false,y:false}},select:{show:false},scales:{y:{range:(_u,min,max)=>[0,Math.max(.01,max*1.1)]}},series:[{label:'Time',value:(_u,v)=>v==null?'—':offsetClock(v*1000,tz)},...series.map(s=>({...s,points:{show:false},value:powerValue}))],bands,axes:[{stroke:ink,grid:{show:false},size:40,space:65,font:'11px system-ui',values:(_u,ticks)=>ticks.map(t=>clock(t*1000,tz))},{stroke:ink,grid:{stroke:grid,width:1},size:48,font:'10px system-ui',values:(_u,ticks)=>ticks.map(v=>unit==='%'?`${fmt(v,0)}%`:fmt(v,1))}]},data,target);
 }
 function updateResult() {
-  if(!current)return;
+  if(!current||!$('forecast-form').checkValidity())return;
   const capacity=Number($('capacity').value), unit=$('unit').value, level=Number($('risk').value)/100;
-  const rows=completeDay().map(r=>({...r,p10:r.p10*capacity,p50:r.p50*capacity,p90:r.p90*capacity,commit:quantileAt(r.p10,r.p50,r.p90,1-level)*capacity}));
+  const {tilt,azimuth}=geometry(), adjusted=tilt!==35||azimuth!==180;
+  const rows=adjustOrientation(completeDay(),tilt,azimuth).map(r=>({...r,p10:r.p10*capacity,p50:r.p50*capacity,p90:r.p90*capacity,commit:quantileAt(r.p10,r.p50,r.p90,1-level)*capacity}));
+  $('geometry-note').textContent=adjusted?`Geometric adjustment · ${tilt}° tilt · ${$('azimuth').selectedOptions[0].textContent}. Clear-sky ratio to 35° south; the band has no site-specific calibration.`:'Fleet forecast · default 35° tilt, south. No geometric adjustment.';
   const energy=key=>rows.reduce((s,r)=>s+r[key]*.25,0);
   const eu=unit==='MW'?'MWh':'kWh';
   $('total-low').textContent=`${fmt(energy('p10'))} ${eu}`; $('total-mid').textContent=`${fmt(energy('p50'))} ${eu}`; $('total-high').textContent=`${fmt(energy('p90'))} ${eu}`;
@@ -173,21 +181,28 @@ function updateResult() {
     values.forEach((value,i)=>{const td=document.createElement(i===0?'th':'td');if(i===0)td.scope='row';td.textContent=value;tr.append(td);}); body.append(tr);
   }
   current.exportRows=rows; current.capacity=capacity;current.unit=unit;current.level=level;
+  current.geometry={tilt,azimuth,adjusted,method:'Clear-sky POA ratio to 35° south; Haurwitz + Erbs; isotropic sky; albedo 0.2'};
 }
 $('risk').addEventListener('input',()=>{updateResult();if(current)setHash();});
-for(const id of ['capacity','unit'])$(id).addEventListener('change',()=>{if(current&&$('forecast-form').checkValidity()){updateResult();setHash();}});
+for(const id of ['capacity','unit','tilt','azimuth'])$(id).addEventListener('change',()=>{if(current&&$('forecast-form').checkValidity()){updateResult();setHash();}});
 function download(text,type,extension) {
   const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=url;a.download=`penumbra-${current.date}.${extension}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 $('csv').addEventListener('click',()=>{
-  if(!current)return;
-  const lines=[`time_utc,time_local,p10_${current.unit},p50_${current.unit},p90_${current.unit},commit_${current.unit},confidence`];
-  for(const r of current.exportRows)lines.push([r.time,`"${current.date} ${offsetClock(r.ms,current.timezone)}"`,r.p10,r.p50,r.p90,r.commit,current.level].join(','));
+  if(!current||!$('forecast-form').reportValidity())return;
+  updateResult();
+  const lines=[`time_utc,time_local,p10_${current.unit},p50_${current.unit},p90_${current.unit},commit_${current.unit},confidence,tilt_degrees,azimuth_degrees,geometric_adjustment`];
+  for(const r of current.exportRows)lines.push([r.time,`"${current.date} ${offsetClock(r.ms,current.timezone)}"`,r.p10,r.p50,r.p90,r.commit,current.level,current.geometry.tilt,current.geometry.azimuth,current.geometry.adjusted].join(','));
   download(lines.join('\r\n'),'text/csv;charset=utf-8','csv');
 });
-$('json').addEventListener('click',()=>{if(current)download(JSON.stringify({location:current.location,date:current.date,horizon:current.horizon,timezone:current.timezone,capacity:current.capacity,powerUnit:current.unit,confidence:current.level,modelMonth:current.modelMonth,calibrationThrough:current.calibrationThrough,note:'Daily sums of interval quantiles are not calibrated daily quantiles. Tilt and orientation are not modelled.',rows:current.exportRows.map(({time,p10,p50,p90,commit})=>({time,p10,p50,p90,commit}))},null,2),'application/json','json');});
+$('json').addEventListener('click',()=>{
+  if(!current||!$('forecast-form').reportValidity())return;
+  updateResult();
+  download(JSON.stringify({location:current.location,date:current.date,horizon:current.horizon,timezone:current.timezone,capacity:current.capacity,powerUnit:current.unit,confidence:current.level,modelMonth:current.modelMonth,calibrationThrough:current.calibrationThrough,geometry:current.geometry,note:'Daily sums of interval quantiles are not calibrated daily quantiles. Geometry settings apply a clear-sky irradiance ratio. Bands have no site-specific calibration.',rows:current.exportRows.map(({time,p10,p50,p90,commit})=>({time,p10,p50,p90,commit}))},null,2),'application/json','json');
+});
 $('share').addEventListener('click',async()=>{
-  setHash();try{await navigator.clipboard.writeText(window.location.href);$('share-status').textContent='Share link copied. It includes the location, capacity and confidence setting.';}
+  if(!$('forecast-form').reportValidity())return;
+  setHash();try{await navigator.clipboard.writeText(window.location.href);$('share-status').textContent='Share link copied. It includes the location, capacity, horizon, confidence and geometry settings.';}
   catch{$('share-status').textContent='Copy this share link:';const input=document.createElement('input');input.readOnly=true;input.value=window.location.href;input.setAttribute('aria-label','Share link');$('share-status').append(input);input.select();}
 });
 const scoreMetrics=['pinball','mae','cover','width'];

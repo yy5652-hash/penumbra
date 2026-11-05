@@ -31,7 +31,7 @@ Built for DATANOVA 2026, track DN-SU-01 Solar Energy Generation Forecasting.
 
 The test window was used twice: first by v1, then by v2, which was chosen on validation and frozen in 16e4605 before its single run. The first frozen version was v1 (`b1ed71c`).
 
-The tool on the site uses a second model that needs only coordinates and capacity. It runs in the browser, so coordinates go from the visitor to Open-Meteo and nothing reaches us. The output assumes a typical fleet mix; tilt and orientation are not modelled yet.
+The tool on the site uses a second model that needs only coordinates and capacity. It runs in the browser, so coordinates go from the visitor to Open-Meteo and nothing reaches us. Optional panel tilt (0–90°) and compass direction apply a geometric adjustment to each quarter-hour's P10/P50/P90. The clear-sky plane-of-array irradiance ratio uses an isotropic sky and a 35° south reference. Those default settings leave the fleet forecast unchanged. See [the method](site/how.html#plant-geometry).
 
 ## Public ledger
 
@@ -69,6 +69,8 @@ python3 -m http.server --directory site 8765
 The 14-slide browser presentation and PowerPoint use `deck/content.js`. Rebuild both with `npm ci --prefix tools` then `NODE_PATH=$PWD/tools/node_modules node deck/build.js`. The HTML deck uses inline SVG charts, arrow keys, touch navigation and one slide per printed page.
 
 For a reboot-safe round-3 run, use `.venv/bin/python tools/resume-round3.py`. Completed monthly predictions, model files and fixtures are reused. Logs and stage checkpoints are saved in `data/round3/`. Browser checks and gallery capture require a local session that can launch Playwright Chromium.
+
+Run `.venv/bin/python tools/resume-round3.py --orientation-only` for the plant-geometry browser checks. They use recorded weather fixtures and cover defaults, adjustments, exports, share restoration, input limits and phone layout. `--browser-only` includes these checks after the horizon, deck and gallery stages.
 
 On macOS without Homebrew libomp, prefix the LightGBM commands with `DYLD_LIBRARY_PATH=$PWD/.venv/lib/python3.11/site-packages/sklearn/.dylibs`. Quartz runs in its own environment: see `src/quartz_baseline.py` for the pinned versions noted in `PROGRESS.md`.
 

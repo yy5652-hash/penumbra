@@ -1,7 +1,8 @@
 """Local round-3 stages with durable logs and atomic checkpoints. No publication.
 
-Default: data, artifacts, checks, then browser checks and gallery.
+Default: data, artifacts, checks, then browser checks and gallery, including Part 4 geometry.
 --local-only skips browser launch; --browser-only resumes browser checks/gallery.
+--orientation-only runs just the Part 4 browser checks against recorded weather.
 Per-quarter downloads, per-quantile models and monthly predictions also checkpoint
 inside their own stages. A failed stage never gets marked complete.
 """
@@ -64,7 +65,11 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--local-only', action='store_true')
     group.add_argument('--browser-only', action='store_true')
+    group.add_argument('--orientation-only', action='store_true')
     args = parser.parse_args()
+    if args.orientation_only:
+        stage('browser-orientation', ['node', 'tools/check-orientation.mjs'], always=True)
+        return
     if not args.browser_only:
         for day in (3, 4):
             # Always check the requested through-date; the downloader skips complete quarters.
@@ -96,8 +101,8 @@ def main():
         stage('browser-deck', ['node', 'tools/check-deck.mjs'], always=True)
         stage('gallery', ['node', 'tools/gallery.mjs'], always=True,
               outputs=[f'docs/gallery/{name}.png' for name in ('01-cambridge-forecast', '02-horizon-choice', '03-ledger', '04-evidence', '05-deck')])
-        # The brief permits Part 4 only after these checks succeed.
-        print('Parts 1–3 passed. Part 4 may now begin.', flush=True)
+        stage('browser-orientation', ['node', 'tools/check-orientation.mjs'], always=True)
+        print('Parts 1–4 browser checks passed.', flush=True)
 
 
 if __name__ == '__main__':

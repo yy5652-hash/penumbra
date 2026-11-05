@@ -3,45 +3,45 @@
     "width": 1600,
     "height": 1000,
     "locale": "en-GB",
-    "source": "e5c0d22a40c0fb4d5caa418b78f457da02ae31a94168ebf24c4086ff475a39df",
-    "sha256": "183bc1d7c4730692b6c344b2a18d6538b54361500462008cecec91ea30acad7e",
-    "capturedAt": "2026-11-05T20:29:18.894Z",
-    "page": "<local>/#lat=52.2&lon=0.12&capacity=5&unit=kW&risk=90&horizon=1&name=Cambridge%2C+United+Kingdom&tz=Europe%2FLondon"
+    "source": "67abaab15f029c1e6c4f3571c099c1362fee2b0d44a2dfc1ea003f8eb2cac960",
+    "sha256": "2f47ece5a0a1cadf72653bb24d0f57ff3f89a0dc7296164c58ec7a6a47f506bb",
+    "capturedAt": "2026-11-05T20:40:19.617Z",
+    "page": "<local>/#lat=52.2&lon=0.12&capacity=5&unit=kW&risk=90&horizon=1&name=Cambridge%2C+United+Kingdom&tilt=35&azimuth=180&tz=Europe%2FLondon"
   },
   "02-horizon-choice.png": {
     "width": 1600,
     "height": 1000,
     "locale": "en-GB",
-    "source": "67856175dd1bbcee1b84d1b1b3a5b31542b6a71f404dd7cbfb99cdc28da124ad",
-    "sha256": "1dfcd4d465f50c10409fa861dd4ee2b9d549c9a3793dfe34e19c72ccc85747a5",
-    "capturedAt": "2026-11-05T20:29:19.134Z",
-    "page": "<local>/#lat=52.2&lon=0.12&capacity=5&unit=kW&risk=90&horizon=3&name=Cambridge%2C+United+Kingdom&tz=Europe%2FLondon"
+    "source": "8631fd2b61ddf73331ecf5d48c50e14675ceff591855fef96f1c333ffa3e9e73",
+    "sha256": "bd225d5b3a541c48a4afa9fef845ca3e675dd6d00b8bd5255fb708db473c643c",
+    "capturedAt": "2026-11-05T20:40:19.962Z",
+    "page": "<local>/#lat=52.2&lon=0.12&capacity=5&unit=kW&risk=90&horizon=3&name=Cambridge%2C+United+Kingdom&tilt=35&azimuth=180&tz=Europe%2FLondon"
   },
   "03-ledger.png": {
     "width": 1600,
     "height": 1000,
     "locale": "en-GB",
-    "source": "67856175dd1bbcee1b84d1b1b3a5b31542b6a71f404dd7cbfb99cdc28da124ad",
-    "sha256": "f60add3fb84c45691810e47a03cb94e103d72c81537f6075e1e03555076f747f",
-    "capturedAt": "2026-11-05T20:29:19.263Z",
-    "page": "<local>/#lat=52.2&lon=0.12&capacity=5&unit=kW&risk=90&horizon=3&name=Cambridge%2C+United+Kingdom&tz=Europe%2FLondon"
+    "source": "8631fd2b61ddf73331ecf5d48c50e14675ceff591855fef96f1c333ffa3e9e73",
+    "sha256": "af54a0308259daba278bdbbbc1848cdb83d7623b5bbeac40d8ad417cbc915298",
+    "capturedAt": "2026-11-05T20:40:20.117Z",
+    "page": "<local>/#lat=52.2&lon=0.12&capacity=5&unit=kW&risk=90&horizon=3&name=Cambridge%2C+United+Kingdom&tilt=35&azimuth=180&tz=Europe%2FLondon"
   },
   "04-evidence.png": {
     "width": 1600,
     "height": 1000,
     "locale": "en-GB",
-    "source": "67856175dd1bbcee1b84d1b1b3a5b31542b6a71f404dd7cbfb99cdc28da124ad",
-    "sha256": "b5e811f0429fbbe932666fe83a1894d9bc42ba37713e66b583aec2a2ed91cd55",
-    "capturedAt": "2026-11-05T20:29:19.400Z",
-    "page": "<local>/#lat=52.2&lon=0.12&capacity=5&unit=kW&risk=90&horizon=3&name=Cambridge%2C+United+Kingdom&tz=Europe%2FLondon"
+    "source": "8631fd2b61ddf73331ecf5d48c50e14675ceff591855fef96f1c333ffa3e9e73",
+    "sha256": "029297fcc8e2be37d65f6b4773ec7acd963dee635dd39d70ffcbfcd3c0b29e58",
+    "capturedAt": "2026-11-05T20:40:20.202Z",
+    "page": "<local>/#lat=52.2&lon=0.12&capacity=5&unit=kW&risk=90&horizon=3&name=Cambridge%2C+United+Kingdom&tilt=35&azimuth=180&tz=Europe%2FLondon"
   },
   "05-deck.png": {
     "width": 1600,
     "height": 1000,
     "locale": "en-GB",
-    "source": "b9696d988cac5e00a998513f527a3423724a6d098dc11970a07f7563ccdde891",
+    "source": "a7cd0fdb98ef6ff42309bbc2c84e8e43ad3f039162a6a5030ce754daf2178b7c",
     "sha256": "09b3eef50096896e867ef3d7e8421d8e95d6892923736b5fa190e9de67144c88",
-    "capturedAt": "2026-11-05T20:29:19.570Z",
+    "capturedAt": "2026-11-05T20:40:20.357Z",
     "page": "<local>/deck.html#slide-1"
   }
 }

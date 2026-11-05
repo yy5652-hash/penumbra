@@ -23,7 +23,11 @@
 <fieldset><legend>Or enter coordinates</legend><div class="pair"><div><label for="latitude">Latitude</label><input id="latitude" type="number" min="-90" max="90" step="any" value="50.85" required></div><div><label for="longitude">Longitude</label><input id="longitude" type="number" min="-180" max="180" step="any" value="4.37" required></div></div></fieldset>
 <label for="horizon">Forecast horizon</label><select id="horizon"><option value="1">Tomorrow</option><option value="2">In 2 days</option><option value="3">In 3 days</option></select>
 <label for="capacity">Installed capacity</label><div class="capacity-input"><input id="capacity" type="number" min="0.001" max="1000000000" step="any" value="5" required><label class="sr-only" for="unit">Capacity unit</label><select id="unit"><option value="kW">kW</option><option value="MW">MW</option></select></div>
-<p class="fine">Assumes a typical fleet mix. Tilt and orientation are not modelled.</p>
+<details class="plant-geometry"><summary>Plant geometry <span class="fine">· optional</span></summary>
+<label for="tilt">Panel tilt (0–90°)</label><input id="tilt" type="number" min="0" max="90" step="any" value="35" placeholder="35" aria-describedby="geometry-help">
+<label for="azimuth">Panel direction</label><select id="azimuth" aria-describedby="geometry-help"><option value="0">North · 0°</option><option value="45">North-east · 45°</option><option value="90">East · 90°</option><option value="135">South-east · 135°</option><option value="180" selected>South · 180°</option><option value="225">South-west · 225°</option><option value="270">West · 270°</option><option value="315">North-west · 315°</option></select>
+</details>
+<p id="geometry-help" class="fine">Default: fleet forecast at 35° south. Other settings apply a geometric adjustment using a clear-sky irradiance ratio and an isotropic sky. <a href="how.html#plant-geometry">Method</a></p>
 <button class="full" type="submit" id="run">Forecast</button>
 </form>
 <p id="location-name" class="location-name">Brussels, Belgium · example location</p>
@@ -34,6 +38,7 @@
 <div class="status-row"><p id="forecast-status" role="status" aria-live="polite">Preparing your forecast…</p><button id="retry" class="secondary" type="button" hidden>Retry forecast</button></div>
 <p id="region-notice" class="notice" hidden>This model was trained in Belgium and tested in Great Britain. Treat results elsewhere as a first estimate.</p>
 <div id="forecast-result" hidden>
+<p id="geometry-note" class="fine"></p>
 <div class="totals" aria-label="Daily energy estimates"><div><span>P10 / LOWER</span><strong id="total-low">—</strong></div><div class="median"><span>P50 / CENTRAL</span><strong id="total-mid">—</strong></div><div><span>P90 / UPPER</span><strong id="total-high">—</strong></div></div>
 <div class="legend" aria-hidden="true"><span class="key band">P10–P90 band</span><span class="key line">P50</span><span class="key dashed">Commitment</span></div>
 <div id="forecast-chart" class="chart" role="img" aria-labelledby="forecast-summary"></div><p id="forecast-summary" class="fine"></p>

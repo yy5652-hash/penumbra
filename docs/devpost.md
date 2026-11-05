@@ -22,7 +22,7 @@ Python, pandas, LightGBM, rolling conformal quantile calibration. A static site 
 - Live site: https://yy5652-hash.github.io/penumbra/
 - Presentation: https://yy5652-hash.github.io/penumbra/deck.html · [PowerPoint download](https://yy5652-hash.github.io/penumbra/Penumbra_DATANOVA_2026.pptx)
 - Code: https://github.com/yy5652-hash/penumbra
-- Forecast tool: search, GPS or coordinates; capacity in kW or MW; 15-minute chart; a risk slider that turns the band into a commitment; CSV and JSON export; shareable links.
+- Forecast tool: search, GPS or coordinates; capacity in kW or MW; optional tilt and compass direction with a clear-sky geometric adjustment; 15-minute chart; a risk slider that turns the band into a commitment; CSV and JSON export; shareable links.
 - Public ledger: one forecast per day, each carrying the hash of the one before, checked in the browser. Live forecasts begin with 4 November 2026.
 - Parity tests confirm that the browser matches Python to 0.0001 on real weather responses.
 

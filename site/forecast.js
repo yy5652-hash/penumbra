@@ -92,6 +92,44 @@ export function forecast(response,lat,lon,model,shifts,horizon=model.horizon??1)
     return {...r,raw:{p10:raw[0],p50:raw[1],p90:raw[2]},...calibrate(...raw,r.elevation,shifts)};
   });
 }
+function validateGeometry(tilt,azimuth) {
+  if (!Number.isFinite(tilt) || tilt<0 || tilt>90 || !Number.isFinite(azimuth) || azimuth<0 || azimuth>360)
+    throw new RangeError('Tilt must be 0–90° and azimuth 0–360° clockwise from north.');
+}
+/** Clear-sky POA / POA at 35° south, using each row's existing solar geometry.
+ * Haurwitz GHI is split with Erbs (Spencer extraterrestrial irradiance).
+ * Isotropic sky + ground reflection, albedo 0.2. No weather-dependent tilt tuning.
+ * Equations: https://pvlib-python.readthedocs.io/en/v0.16.1/reference/irradiance.html
+ */
+export function orientationRatio(row,tilt=35,azimuth=180) {
+  validateGeometry(tilt,azimuth);
+  if (tilt===35 && azimuth===180) return 1;
+  if (!(row.elevation>0) || !(row.clear_sky>0)) return 0;
+  const sinEl=Math.sin(row.elevation*RAD), cosEl=Math.cos(row.elevation*RAD);
+  const date=new Date(row.ms), doy=Math.floor((row.ms-Date.UTC(date.getUTCFullYear(),0,0))/86400000);
+  const b=2*Math.PI*(doy-1)/365;
+  const extra=1366.1*(1.00011+.034221*Math.cos(b)+.00128*Math.sin(b)+.000719*Math.cos(2*b)+.000077*Math.sin(2*b));
+  const kt=Math.max(0,Math.min(1,row.clear_sky/(extra*Math.max(.065,sinEl))));
+  const diffuseFraction=kt<=.22 ? 1-.09*kt : kt<=.8 ? .9511-.1604*kt+4.388*kt**2-16.638*kt**3+12.336*kt**4 : .165;
+  // Erbs sets DNI to zero above 87° zenith, preserving GHI as diffuse light.
+  const dni=row.elevation<3 ? 0 : row.clear_sky*(1-diffuseFraction)/sinEl;
+  const dhi=row.clear_sky-dni*sinEl;
+  const poa=(slope,bearing)=>{
+    const cosTilt=Math.cos(slope*RAD);
+    const incidence=Math.max(0,sinEl*cosTilt+cosEl*Math.sin(slope*RAD)*Math.cos((row.azimuth-bearing)*RAD));
+    return dni*incidence+dhi*(1+cosTilt)/2+.2*row.clear_sky*(1-cosTilt)/2;
+  };
+  return poa(tilt,azimuth)/poa(35,180);
+}
+/** Adjust calibrated interval quantiles together; retain the original fleet rows. */
+export function adjustOrientation(rows,tilt=35,azimuth=180) {
+  validateGeometry(tilt,azimuth);
+  if (tilt===35 && azimuth===180) return rows;
+  return rows.map(row=>{
+    const ratio=orientationRatio(row,tilt,azimuth);
+    return {...row,p10:row.p10*ratio,p50:row.p50*ratio,p90:row.p90*ratio};
+  });
+}
 export function quantileAt(p10,p50,p90,q) {
   if (q<.1-1e-12 || q>.9+1e-12 || !Number.isFinite(q)) throw new RangeError('Quantile must be between 0.1 and 0.9.');
   return q<=.5 ? p10+(p50-p10)*(q-.1)/.4 : p50+(p90-p50)*(q-.5)/.4;

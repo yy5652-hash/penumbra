@@ -183,7 +183,7 @@ text(s, [
   { text: "Browser results match Python to 0.0001 on real weather, tested on every change", options: { bullet: { indent: 14 } } },
 ], { x: 8.6, y: 1.8, w: 4.13, h: 4.2, fontSize: 16, paraSpaceAfter: 8, objectName: "Product features" });
 text(s, SITE, { x: 8.6, y: 6.05, w: 4.13, h: 0.35, fontSize: 14, bold: true, color: C.accent1, objectName: "Link" });
-s.addNotes("Open the site, search for a place, move the slider. Assumes a typical fleet mix; tilt and orientation are not modelled in this version.");
+s.addNotes("Open the site, search for a place, move the slider. Optional tilt and compass inputs apply a clear-sky geometric adjustment. Default 35 degrees south preserves the fleet forecast.");
 
 // 10
 s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Product" });
@@ -210,7 +210,7 @@ s.addTable([
   row("Measured coverage published", "Not listed", "Not listed", "Not listed", "No", "Yes"),
   row("Daily record against the grid operator", "Not listed", "No", "Not listed", "No", "Yes"),
   row("Risk-based commitment", "Not listed", "No", "Not listed", "No", "Yes"),
-  row("Tilt and orientation", "Yes", "Yes", "Yes", "Yes", "Next version"),
+  row("Tilt and orientation", "Yes", "Yes", "Yes", "Yes", "Geometric"),
 ], { x: 0.6, y: 1.8, w: 12.13, colW: [4.13, 1.6, 1.6, 1.6, 1.6, 1.6], rowH: 0.62, fontSize: 14, color: C.text1, border: { type: "solid", pt: 0.5, color: HEX.accent5 }, valign: "middle", objectName: "Competitor table" });
 text(s, "Based on each product's public pages and documentation, November 2026. \"Not listed\" means we did not find it there.", { x: 0.6, y: 6.2, w: 12.1, h: 0.5, fontSize: 12, color: C.accent4, objectName: "Table note" });
 s.addNotes("Solcast is the international commercial standard, Forecast.Solar is common among home users and developers, Sprixin is the listed Chinese market leader, Quartz is the open-source baseline.");
@@ -236,7 +236,7 @@ moon(s, 0.8, 1.25, 0.8);
 s.addText("Try tomorrow", { placeholder: "title" });
 s.addText("v2: 10.8% lower Belgian pinball loss. 80.2% coverage. A record anyone can check.", { placeholder: "body" });
 text(s, SITE, { x: 0.8, y: 5.1, w: 11.7, h: 0.5, fontSize: 24, bold: true, color: C.background1, objectName: "Site link" });
-text(s, "Next: plant tilt and orientation, alerts and an API, more countries on the ledger.", { x: 0.8, y: 6.5, w: 11.7, h: 0.4, fontSize: 14, color: C.accent5, objectName: "Next steps" });
+text(s, "Next: alerts and an API, more countries on the ledger.", { x: 0.8, y: 6.5, w: 11.7, h: 0.4, fontSize: 14, color: C.accent5, objectName: "Next steps" });
 s.addNotes("Thank you. The ledger keeps running through judging.");
 
 
