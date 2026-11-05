@@ -33,6 +33,12 @@ VARIANTS = {
                       base="tso_p50", params=TUNED),
     "res_bag": dict(feats=FEATURES["grid"] + ["tso_err7", "tso_abs7"], base="tso_p50", params=SMALL, seeds=[1, 2, 3, 4, 5]),
 }
+VARIANTS["res_ec"] = dict(feats=VARIANTS["res_gap"]["feats"] + ["k_ec", "ghi_ec", "gap_ec", "kdiff_ec"],
+                          base="tso_p50", params=TUNED)
+VARIANTS["res_ext"] = {**VARIANTS["res_gap"], "table": "data/table_v2.parquet"}
+VARIANTS["res_ext_ec"] = {**VARIANTS["res_ec"], "table": "data/table_v2.parquet"}
+VARIANTS["res_ext_big"] = {**VARIANTS["res_ext"], "params": {**TUNED, "n_estimators": 800, "num_leaves": 31}}
+VARIANTS["res_ext_slow"] = {**VARIANTS["res_ext"], "params": {**TUNED, "n_estimators": 1200, "learning_rate": 0.01}}
 OUT = Path("data/results/exp")
 
 

@@ -61,13 +61,23 @@ def one_step(run, step, pts):
             continue
         start = int(parts[1])
         end = int(lines[n + 1].split(":")[1]) - 1
-        h = eccodes.codes_new_from_message(get(stem, {"Range": f"bytes={start}-{end}"}))
+        message = get(stem, {"Range": f"bytes={start}-{end}"})
+        h = None
         try:
+            if message is None:
+                raise ValueError("missing GRIB message")
+            h = eccodes.codes_new_from_message(message)
             if (eccodes.codes_get(h, "Ni"), eccodes.codes_get(h, "Nj")) != (1440, 721):
                 raise ValueError("unexpected grid")
             values = eccodes.codes_get_values(h)
+            if values.size != 1440 * 721:
+                raise ValueError("unexpected grid size")
+        except (eccodes.CodesInternalError, ValueError) as exc:
+            print(f"WARNING {run:%Y-%m-%d} f{step:03d} {field}: skipped ({exc})", flush=True)
+            continue
         finally:
-            eccodes.codes_release(h)
+            if h is not None:
+                eccodes.codes_release(h)
         window = parts[5].split(" ")[0]  # e.g. 24-30
         for name, idx in pts.items():
             box = values[idx]

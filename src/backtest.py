@@ -31,6 +31,14 @@ CAL_DAYS = 60
 FIRST_OOS = "2025-01-01"
 
 
+# v2, frozen 2026-11-05 after validation round 2: training history from 2021, fresh GFS, D-1 morning and gap features.
+TUNED_PARAMS = {**RESIDUAL_PARAMS, "n_estimators": 400, "learning_rate": 0.02, "num_leaves": 15, "min_child_samples": 1000,
+                "colsample_bytree": 0.6}
+V2_FEATS = WEATHER + LAGS + TSO + TSO_HISTORY + ["m_ratio1", "m_err1", "k_gfs", "ghi_gfs", "cloud_gfs",
+                                                 "tso_k", "gap_d2", "gap_gfs", "kdiff_gfs"]
+FROZEN_V2 = {"grid": dict(feats=V2_FEATS, base="tso_p50", params=TUNED_PARAMS)}
+
+
 def pinball(y, q, a):
     d = y - q
     return np.maximum(a * d, (a - 1) * d)
@@ -119,7 +127,25 @@ def report(df, label, columns):
     return res
 
 
+def main_v2():
+    """The single v2 run on the test window: same scoring as v1, on the extended table."""
+    table = pd.read_parquet("data/table_v2.parquet").dropna(subset=TSO)
+    end = "2026-10-31"
+    table = table[table.datetime < pd.Timestamp(end, tz="UTC") + pd.Timedelta(days=1)]
+    oos = conformalize(fit_predict(table, start=FIRST_OOS, end=end, **FROZEN_V2["grid"]), scoped=True)
+    oos = oos[oos.datetime >= pd.Timestamp("2025-11-01", tz="UTC")].sort_values(["region", "datetime"]).reset_index(drop=True)
+    oos.to_parquet("data/results/test_v2_grid.parquet")
+    cols = {"TSO (Elia day-ahead 11h)": ("tso_p10", "tso_p50", "tso_p90"), "Penumbra v2": ("p10c", "p50", "p90c")}
+    report(oos, "test v2", cols).to_csv("data/results/test_v2_scores.csv", index=False)
+    cis = {scope: daily_block_ci(part, cols["Penumbra v2"], cols["TSO (Elia day-ahead 11h)"])
+           for scope, part in (("Belgium", oos[oos.region == "Belgium"]), ("Provinces", oos[oos.region != "Belgium"]))}
+    print(json.dumps(cis, indent=1))
+    Path("data/results/test_v2_ci.json").write_text(json.dumps(cis, indent=1))
+
+
 def main(stage):
+    if stage == "test_v2":
+        return main_v2()
     table = pd.read_parquet("data/table.parquet")
     table = table.dropna(subset=["tso_p50", "tso_p10", "tso_p90"])
     if stage == "val":

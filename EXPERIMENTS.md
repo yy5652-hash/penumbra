@@ -70,4 +70,13 @@ Paired daily pinball difference against Elia, Belgium; v1 frozen = -0.00065.
 | 5-seed bagging | -0.00071 [-0.00101, -0.00041] | -0.00067 | small |
 | D-1 morning measured vs Elia, 06-08 UTC | -0.00074 [-0.00104, -0.00044] | -0.00070 | small gain |
 | Tuned: 400 trees, lr 0.02, 15 leaves, min child 1000, colsample 0.6 | -0.00081 [-0.00110, -0.00053] | -0.00075 | best single change |
-| Fresh NWP at the cutoff: ECMWF IFS and GFS 00z of D-1 from AWS archives | pending download | | |
+| + fresh GFS 00z of D-1 (NOAA archive) | -0.00087 [-0.00116, -0.00057] | -0.00079 | small gain |
+| + gaps between each forecast and Elia's median | -0.00089 [-0.00121, -0.00058] | -0.00078 | small gain |
+| Train on the last 240 days only (learning curve) | -0.00064 | -0.00059 | more history matters |
+| + fresh ECMWF IFS 00z of D-1 (open-data archive) | -0.00092 [-0.00121, -0.00061] | -0.00080 | no gain over GFS |
+| Training history from 2021 (Elia + GFS; 48 h features from 2024) | -0.00101 [-0.00126, -0.00073] | -0.00094 | best |
+| History from 2021 + ECMWF | -0.00096 | -0.00090 | no gain |
+
+Same 119,958 validation rows for every variant, share of Elia's pinball (Belgium / provinces):
+v1 -6.0% / -5.0%; gaps -7.8% / -6.0%; + ECMWF -8.1% / -6.1%; history from 2021 -9.1% / -7.4% (MAE 3.10% vs Elia 3.28%);
+average of the last two -9.0% / -7.2%. Coverage of the 80% band 78% to 79% for all round-2 variants.

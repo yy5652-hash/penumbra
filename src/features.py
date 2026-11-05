@@ -231,6 +231,9 @@ def build(out=OUT, live=False, extended=False):
         t = feats.join(e, how="inner").reset_index(names="datetime")
         t["region"] = name
         t["cf"] = t["measured"] / t["monitoredcapacity"]
+        if extended:
+            # Invalid historical measurements must not enter targets or lag features.
+            t["cf"] = t["cf"].where(t["cf"].between(0, 1))
         for src, dst in [("dayahead11hforecast", "tso_p50"), ("dayahead11hconfidence10", "tso_p10"),
                          ("dayahead11hconfidence90", "tso_p90")]:
             t[dst] = t[src] / t["monitoredcapacity"]
