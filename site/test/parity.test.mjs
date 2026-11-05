@@ -7,10 +7,12 @@ const model=await read('../model/weather.json'), shifts=await read('../data/shif
 const close=(a,b,label)=>{ if(b===null) assert.ok(Number.isNaN(a),label); else assert.ok(Number.isFinite(a)&&Math.abs(a-b)<=1e-4,`${label}: ${a} vs ${b}`); };
 for (const file of (await readdir(new URL('fixtures/',import.meta.url))).sort()) {
   test(`Python parity: ${file}`,async()=>{
-    const f=await read(`fixtures/${file}`), rows=forecast(f.open_meteo,f.lat,f.lon,model,f.shifts??shifts);
+    const f=await read(`fixtures/${file}`), horizon=f.horizon??1;
+    const m=horizon===1?model:await read(`../model/weather_h${horizon}.json`);
+    const rows=forecast(f.open_meteo,f.lat,f.lon,m,f.shifts??shifts,horizon);
     assert.deepEqual(rows.map(r=>r.time),f.times);
     rows.forEach((r,i)=>{
-      for(const n of model.features) close(r[n],f.features[n][i],`${file} ${i} ${n}`);
+      for(const n of m.features) close(r[n],f.features[n][i],`${file} ${i} ${n}`);
       for(const q of ['p10','p50','p90']) close(r.raw[q],f.raw[q][i],`${file} ${i} raw ${q}`);
       close(r.p10,f.p10[i],`${file} ${i} calibrated low`); close(r.p90,f.p90[i],`${file} ${i} calibrated high`);
     });

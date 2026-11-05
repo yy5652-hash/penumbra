@@ -4,7 +4,8 @@ const $=id=>document.getElementById(id);
 const WEATHER='https://previous-runs-api.open-meteo.com/v1/forecast';
 const GEOCODE='https://geocoding-api.open-meteo.com/v1/search';
 let location={name:'Brussels, Belgium',latitude:50.85,longitude:4.37,timezone:'Europe/Brussels'};
-let modelPromise, current, weatherCache, forecastPlot, ledgerPlot, runId=0, searchId=0;
+const modelPromises=new Map();
+let current, weatherCache, forecastPlot, ledgerPlot, runId=0, searchId=0;
 const fmt=(v,d=2)=>Number.isFinite(v) ? v.toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}) : '—';
 const percent=v=>Number.isFinite(v) ? `${fmt(v*100,1)}%` : '—';
 const localDate=(t,tz)=>{
@@ -19,15 +20,21 @@ async function getJSON(url) {
   if(!response.ok) throw new Error(`Request failed (${response.status}).`);
   const body=await response.json(); if(body.error) throw new Error(body.reason || 'Weather data unavailable.'); return body;
 }
-function model() {
-  if(!modelPromise) {
-    $('forecast-status').textContent='Loading the 3 MB model and calibration. Your browser caches the model for later visits…';
-    modelPromise=Promise.all([getJSON('model/weather.json'),getJSON('data/shifts.json')]).catch(e=>{modelPromise=null;throw e;});
+function model(horizon) {
+  if(!modelPromises.has(horizon)) {
+    $('forecast-status').textContent=`Loading the D+${horizon} model and calibration…`;
+    const promise=Promise.all([getJSON(`model/weather_h${horizon}.json`),getJSON('data/shifts.json')])
+      .then(([m,shifts])=>{
+        const sh=horizon===1?shifts:shifts[`h${horizon}`];
+        if(!sh)throw new Error('Calibration is unavailable for this horizon.');
+        return [m,sh];
+      }).catch(e=>{modelPromises.delete(horizon);throw e;});
+    modelPromises.set(horizon,promise);
   }
-  return modelPromise;
+  return modelPromises.get(horizon);
 }
 function setHash() {
-  const p=new URLSearchParams({lat:location.latitude,lon:location.longitude,capacity:$('capacity').value,unit:$('unit').value,risk:$('risk').value,name:location.name});
+  const p=new URLSearchParams({lat:location.latitude,lon:location.longitude,capacity:$('capacity').value,unit:$('unit').value,risk:$('risk').value,horizon:$('horizon').value,name:location.name});
   if(location.timezone) p.set('tz',location.timezone);
   history.replaceState(null,'',`#${p}`);
 }
@@ -40,6 +47,7 @@ function restoreHash() {
     const timezone=p.get('tz'); if(timezone) new Intl.DateTimeFormat('en',{timeZone:timezone});
     location={latitude:lat,longitude:lon,name:(p.get('name')||'Selected coordinates').slice(0,150),timezone};
     $('latitude').value=lat; $('longitude').value=lon; $('capacity').value=cap; $('unit').value=p.get('unit')==='MW'?'MW':'kW'; $('risk').value=risk;
+    $('horizon').value=['1','2','3'].includes(p.get('horizon'))?p.get('horizon'):'1';
     return true;
   } catch { return false; }
 }
@@ -74,20 +82,21 @@ for(const name of ['latitude','longitude']) $(name).addEventListener('input',()=
   location={name:'Selected coordinates',latitude:Number($('latitude').value),longitude:Number($('longitude').value),timezone:null};
   $('location-name').textContent=location.name;
   runId++; current=null; $('forecast-result').hidden=true; $('retry').hidden=true; $('run').disabled=false;
-  $('forecast-status').textContent='Coordinates changed. Select Forecast tomorrow to update.';
+  $('forecast-status').textContent='Coordinates changed. Select Forecast to update.';
 });
 $('forecast-form').addEventListener('submit',e=>{e.preventDefault();runForecast();});
 $('retry').addEventListener('click',()=>runForecast());
+$('horizon').addEventListener('change',()=>runForecast());
 async function runForecast() {
   if(!$('forecast-form').reportValidity())return;
-  const id=++runId; current=null;
+  const id=++runId, horizon=Number($('horizon').value); current=null;
   const place={...location,latitude:Number($('latitude').value),longitude:Number($('longitude').value)};
   $('run').disabled=true; $('retry').hidden=true; $('forecast-result').hidden=true;
   $('result-title').textContent=place.name; $('location-name').textContent=place.name;
   $('region-notice').hidden=place.latitude>=35&&place.latitude<=60&&place.longitude>=-15&&place.longitude<=30;
   $('forecast-status').textContent='Loading weather from four models…';
   try {
-    const assets=model();
+    const assets=model(horizon);
     // Resolve the actual site's timezone before choosing tomorrow. The feature
     // request below still uses UTC, exactly as the parity fixtures do.
     const weatherJob=(async()=>{
@@ -97,27 +106,27 @@ async function runForecast() {
         tz=(await getJSON(meta)).timezone;
         if(!tz)throw new Error('Could not resolve the location timezone.');
       }
-      const tomorrow=addDay(localDate(Date.now(),tz),1);
-      const key=`${place.latitude},${place.longitude},${tomorrow}`;
+      const tomorrow=addDay(localDate(Date.now(),tz),horizon);
+      const key=`${place.latitude},${place.longitude},${tomorrow},${horizon}`;
       if(weatherCache?.key===key)return {...weatherCache,tz,tomorrow};
-      const url=new URL(WEATHER); url.search=new URLSearchParams({latitude:place.latitude,longitude:place.longitude,start_date:addDay(tomorrow,-1),end_date:addDay(tomorrow,1),hourly:['shortwave_radiation','direct_radiation','cloud_cover','temperature_2m'].map(v=>v+'_previous_day2').join(','),models:MODELS.join(','),timezone:'UTC'});
+      const url=new URL(WEATHER); url.search=new URLSearchParams({latitude:place.latitude,longitude:place.longitude,start_date:addDay(tomorrow,-1),end_date:addDay(tomorrow,1),hourly:['shortwave_radiation','direct_radiation','cloud_cover','temperature_2m'].map(v=>v+`_previous_day${horizon+1}`).join(','),models:MODELS.join(','),timezone:'UTC'});
       const response=await getJSON(url); return {key,response,tz,tomorrow};
     })();
     const [[m,shifts],w]=await Promise.all([assets,weatherJob]);
     if(id!==runId)return;
     weatherCache=w; location={...place,timezone:w.tz};
-    const rows=forecast(w.response,place.latitude,place.longitude,m,shifts).filter(r=>localDate(r.ms,w.tz)===w.tomorrow);
+    const rows=forecast(w.response,place.latitude,place.longitude,m,shifts,horizon).filter(r=>localDate(r.ms,w.tz)===w.tomorrow);
     // At dawn and dusk the clear-sky mean is 20 W/m2 or less: training excluded those rows, so they count as zero output.
     for(const r of rows) if(!(r.cs_hour>20)) Object.assign(r,{p10:0,p50:0,p90:0});
     const lit=rows.filter(r=>r.cs_hour>20);
     const valid=lit.filter(r=>Number.isFinite(r.k_mean));
-    if(!valid.length) {$('forecast-status').textContent='No daylight weather data available for tomorrow at this location. Try another location or retry later.'; $('retry').hidden=false;return;}
+    if(!valid.length) {$('forecast-status').textContent='No daylight weather data available for the selected date at this location. Try another location or retry later.'; $('retry').hidden=false;return;}
     // A partially missing daylight ensemble must not silently become zero energy.
     if(valid.length!==lit.length)throw new Error('Weather data is incomplete for some daylight intervals. Please retry later.');
-    current={rows,timezone:w.tz,date:w.tomorrow,location:{...location},modelMonth:m.month,calibrationThrough:shifts.through};
+    current={horizon,rows,timezone:w.tz,date:w.tomorrow,location:{...location},modelMonth:m.month,calibrationThrough:shifts.through};
     $('forecast-result').hidden=false;
-    $('result-date').textContent=`${w.tomorrow} · ${w.tz} · 15-minute intervals`;
-    $('model-version').textContent=`Weather only · ${m.month}`;
+    $('result-date').textContent=`D+${horizon} · ${w.tomorrow} · ${w.tz} · 15-minute intervals`;
+    $('model-version').textContent=`Weather only · D+${horizon} · ${m.month}`;
     $('forecast-status').textContent=`Ready · four weather models · calibration through ${shifts.through}`;
     updateResult(); setHash();
   } catch(e) {
@@ -176,7 +185,7 @@ $('csv').addEventListener('click',()=>{
   for(const r of current.exportRows)lines.push([r.time,`"${current.date} ${offsetClock(r.ms,current.timezone)}"`,r.p10,r.p50,r.p90,r.commit,current.level].join(','));
   download(lines.join('\r\n'),'text/csv;charset=utf-8','csv');
 });
-$('json').addEventListener('click',()=>{if(current)download(JSON.stringify({location:current.location,date:current.date,timezone:current.timezone,capacity:current.capacity,powerUnit:current.unit,confidence:current.level,modelMonth:current.modelMonth,calibrationThrough:current.calibrationThrough,note:'Daily sums of interval quantiles are not calibrated daily quantiles. Tilt and orientation are not modelled.',rows:current.exportRows.map(({time,p10,p50,p90,commit})=>({time,p10,p50,p90,commit}))},null,2),'application/json','json');});
+$('json').addEventListener('click',()=>{if(current)download(JSON.stringify({location:current.location,date:current.date,horizon:current.horizon,timezone:current.timezone,capacity:current.capacity,powerUnit:current.unit,confidence:current.level,modelMonth:current.modelMonth,calibrationThrough:current.calibrationThrough,note:'Daily sums of interval quantiles are not calibrated daily quantiles. Tilt and orientation are not modelled.',rows:current.exportRows.map(({time,p10,p50,p90,commit})=>({time,p10,p50,p90,commit}))},null,2),'application/json','json');});
 $('share').addEventListener('click',async()=>{
   setHash();try{await navigator.clipboard.writeText(window.location.href);$('share-status').textContent='Share link copied. It includes the location, capacity and confidence setting.';}
   catch{$('share-status').textContent='Copy this share link:';const input=document.createElement('input');input.readOnly=true;input.value=window.location.href;input.setAttribute('aria-label','Share link');$('share-status').append(input);input.select();}
@@ -261,6 +270,9 @@ async function loadEvidence() {
     for(const text of [r.portability_note,r.quartz]){const p=document.createElement('p');p.className='notice';p.textContent=text;parent.append(p);}
     const causality=document.createElement('div');causality.className='evidence-block';const ch=document.createElement('h3');ch.textContent='How causality was kept';const cp=document.createElement('p');cp.textContent=r.causality+' The public ledger identifies retrospective backfills explicitly.';causality.append(ch,cp);parent.append(causality);
     evidenceTable(parent,'Operator value: Belgium',r.operator,'11.76 GW monitored · v2 test days');
+    const horizons=await getJSON('data/horizons.json');
+    evidenceTable(parent,'Accuracy by horizon',horizons,horizons.note);
+    const figure=document.createElement('img');figure.src='img/horizons.png';figure.alt='Weather-only pinball loss and band width by horizon. Elia is a D+1 reference only.';figure.style.width='100%';figure.style.height='auto';parent.append(figure);
   }catch{parent.textContent='Published results could not be loaded.';$('evidence-retry').hidden=false;}
 }
 $('evidence-retry').addEventListener('click',loadEvidence);

@@ -1,0 +1,135 @@
+{
+  "headers": [
+    "Horizon",
+    "Scope",
+    "Pinball",
+    "MAE",
+    "Cover 80",
+    "Width"
+  ],
+  "rows": [
+    [
+      "D+1",
+      "Belgium",
+      "0.012942",
+      "4.19%",
+      "79.07%",
+      "12.28%"
+    ],
+    [
+      "D+1",
+      "Provinces",
+      "0.014479",
+      "4.68%",
+      "79.47%",
+      "13.73%"
+    ],
+    [
+      "D+2",
+      "Belgium",
+      "0.014799",
+      "4.80%",
+      "78.62%",
+      "14.01%"
+    ],
+    [
+      "D+2",
+      "Provinces",
+      "0.016258",
+      "5.26%",
+      "79.29%",
+      "15.39%"
+    ],
+    [
+      "D+3",
+      "Belgium",
+      "0.017364",
+      "5.54%",
+      "79.13%",
+      "16.99%"
+    ],
+    [
+      "D+3",
+      "Provinces",
+      "0.018541",
+      "5.93%",
+      "79.67%",
+      "18.04%"
+    ]
+  ],
+  "note": "Weather-only models. Fixed features and parameters for all horizons. 2025-05-01 to 2026-10-31. Common daylight rows: 321,625 across 549 days. Monthly refits and rolling scoped calibration use a gap of 2, 3 or 4 days. Full-day lags end before the issue day; the frozen weather specification uses no output lags. Elia is a D+1 reference only. Its score uses rows with a published day-ahead forecast.",
+  "results": [
+    {
+      "horizon": 1,
+      "scope": "Belgium",
+      "pinball": 0.012941676835171887,
+      "MAE": 0.04190813345204028,
+      "cover80": 0.790724878306479,
+      "width": 0.12284348044066558
+    },
+    {
+      "horizon": 1,
+      "scope": "Provinces",
+      "pinball": 0.014479158173331485,
+      "MAE": 0.0467586992012452,
+      "cover80": 0.7947303506322766,
+      "width": 0.1372805399387122
+    },
+    {
+      "horizon": 2,
+      "scope": "Belgium",
+      "pinball": 0.014798869888001302,
+      "MAE": 0.047999396791376436,
+      "cover80": 0.7861590128674389,
+      "width": 0.1401360297244628
+    },
+    {
+      "horizon": 2,
+      "scope": "Provinces",
+      "pinball": 0.016258170251257975,
+      "MAE": 0.05257645108712453,
+      "cover80": 0.79291755329963,
+      "width": 0.15389858894254843
+    },
+    {
+      "horizon": 3,
+      "scope": "Belgium",
+      "pinball": 0.017363609110587607,
+      "MAE": 0.055366057644012034,
+      "cover80": 0.7912908946832194,
+      "width": 0.16987543980201214
+    },
+    {
+      "horizon": 3,
+      "scope": "Provinces",
+      "pinball": 0.01854094735889038,
+      "MAE": 0.059280361207473674,
+      "cover80": 0.7967024030576978,
+      "width": 0.18035500078123617
+    }
+  ],
+  "elia": [
+    {
+      "scope": "Belgium",
+      "rows": 26465,
+      "pinball": 0.01066934308564866,
+      "mae": 0.031542121153323374,
+      "rmse": 0.04631506058711356,
+      "cover80": 0.8228981673908936,
+      "below10": 0.08751180804836577,
+      "above90": 0.0895900245607406,
+      "width": 0.1377728371175031
+    },
+    {
+      "scope": "Provinces",
+      "rows": 294728,
+      "pinball": 0.012202785919764439,
+      "mae": 0.03719166245213998,
+      "rmse": 0.05494688221327369,
+      "cover80": 0.7554049835780787,
+      "below10": 0.1329123802285497,
+      "above90": 0.11168263619337152,
+      "width": 0.1358905595151427
+    }
+  ]
+}

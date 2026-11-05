@@ -20,6 +20,7 @@ Python, pandas, LightGBM, rolling conformal quantile calibration. A static site 
 
 ## Implementation and demo
 - Live site: https://yy5652-hash.github.io/penumbra/
+- Presentation: https://yy5652-hash.github.io/penumbra/deck.html · [PowerPoint download](https://yy5652-hash.github.io/penumbra/Penumbra_DATANOVA_2026.pptx)
 - Code: https://github.com/yy5652-hash/penumbra
 - Forecast tool: search, GPS or coordinates; capacity in kW or MW; 15-minute chart; a risk slider that turns the band into a commitment; CSV and JSON export; shareable links.
 - Public ledger: one forecast per day, each carrying the hash of the one before, checked in the browser. Live forecasts begin with 4 November 2026.
@@ -44,4 +45,21 @@ The average Belgian band falls from 1,561 MW to 1,073 MW. Mean P10 rises from 1,
 Yi Yu: problem framing, data, modelling, validation, product and presentation. AI coding assistants helped write and check code.
 
 ## Third-party acknowledgements
-Elia Open Data; NOAA GFS archive; Open-Meteo.com (CC BY 4.0); Sheffield Solar PV_Live; Energy-Charts; Quartz Solar Forecast (MIT), used only as a baseline; uPlot (MIT).
+Elia Open Data; NOAA GFS archive; Open-Meteo.com (CC BY 4.0); Sheffield Solar PV_Live; Energy-Charts; Quartz Solar Forecast (MIT), used only as a baseline; uPlot (MIT); Matplotlib; PptxGenJS; Playwright.
+
+<!-- horizons:start -->
+## Horizons
+
+Weather-only models. Fixed features and parameters for all horizons. 2025-05-01 to 2026-10-31. Common daylight rows: 321,625 across 549 days. Monthly refits and rolling scoped calibration use a gap of 2, 3 or 4 days. Full-day lags end before the issue day; the frozen weather specification uses no output lags. Elia is a D+1 reference only. Its score uses rows with a published day-ahead forecast.
+
+| Horizon | Scope | Pinball | MAE | Cover 80 | Width |
+|---|---|---|---|---|---|
+| D+1 | Belgium | 0.012942 | 4.19% | 79.07% | 12.28% |
+| D+1 | Provinces | 0.014479 | 4.68% | 79.47% | 13.73% |
+| D+2 | Belgium | 0.014799 | 4.80% | 78.62% | 14.01% |
+| D+2 | Provinces | 0.016258 | 5.26% | 79.29% | 15.39% |
+| D+3 | Belgium | 0.017364 | 5.54% | 79.13% | 16.99% |
+| D+3 | Provinces | 0.018541 | 5.93% | 79.67% | 18.04% |
+
+![Weather-only accuracy and band width by horizon](../site/img/horizons.png)
+<!-- horizons:end -->

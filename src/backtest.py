@@ -44,12 +44,12 @@ def pinball(y, q, a):
     return np.maximum(a * d, (a - 1) * d)
 
 
-def fit_predict(table, feats, start, end, base=None, params=PARAMS, history_days=None):
+def fit_predict(table, feats, start, end, base=None, params=PARAMS, history_days=None, gap_days=2, model_dir=None):
     """One model per month, fitted only on rows before that month. With base, learn quantiles of the residual."""
     out = []
     for month in pd.date_range(start, end, freq="MS", tz="UTC"):
         nxt = month + pd.offsets.MonthBegin(1)
-        tr = table[table.datetime < month - pd.Timedelta(days=2)]
+        tr = table[table.datetime < month - pd.Timedelta(days=gap_days)]
         if history_days:
             tr = tr[tr.datetime >= month - pd.Timedelta(days=history_days)]
         te = table[(table.datetime >= month) & (table.datetime < nxt)]
@@ -57,9 +57,19 @@ def fit_predict(table, feats, start, end, base=None, params=PARAMS, history_days
             continue
         preds = {}
         for a in QUANTILES:
-            m = lgb.LGBMRegressor(objective="quantile", alpha=a, **params)
-            m.fit(tr[feats], tr["cf"] - (tr[base] if base else 0))
-            preds[a] = m.predict(te[feats]) + (te[base].values if base else 0)
+            path = Path(model_dir) / f'{month:%Y-%m}_{int(a * 100)}.txt' if model_dir else None
+            if path and path.exists():
+                booster = lgb.Booster(model_file=str(path))
+            else:
+                m = lgb.LGBMRegressor(objective="quantile", alpha=a, **params)
+                m.fit(tr[feats], tr["cf"] - (tr[base] if base else 0))
+                booster = m
+                if path:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = path.with_suffix('.tmp')
+                    m.booster_.save_model(str(tmp))
+                    tmp.rename(path)
+            preds[a] = booster.predict(te[feats], num_threads=params['n_jobs']) + (te[base].values if base else 0)
         arr = np.sort(np.clip(np.column_stack([preds[a] for a in QUANTILES]), 0, None), axis=1)
         out.append(te[["datetime", "date", "region", "cf", "elevation", "tso_p10", "tso_p50", "tso_p90", "cf_d2"]]
                    .assign(p10=arr[:, 0], p50=arr[:, 1], p90=arr[:, 2]))
@@ -67,7 +77,7 @@ def fit_predict(table, feats, start, end, base=None, params=PARAMS, history_days
     return pd.concat(out, ignore_index=True)
 
 
-def conformalize(df, days=CAL_DAYS, scoped=False, season=False):
+def conformalize(df, days=CAL_DAYS, scoped=False, season=False, gap_days=2):
     """Asymmetric rolling CQR. For each day, shift P10 and P90 by trailing out-of-sample errors in the same
     width and solar-height bucket, using only outcomes known by the end of D-2."""
     df = df.sort_values("datetime").reset_index(drop=True)
@@ -83,8 +93,8 @@ def conformalize(df, days=CAL_DAYS, scoped=False, season=False):
     dates = np.sort(df.date.unique())
     groups = {d: g for d, g in df.groupby("date")}
     for d in dates:
-        lo = d - np.timedelta64(days + 2, "D")
-        hi = d - np.timedelta64(2, "D")
+        lo = d - np.timedelta64(days + gap_days, "D")
+        hi = d - np.timedelta64(gap_days, "D")
         recent = [groups[x] for x in dates[(dates >= lo) & (dates < hi)]]
         if len(recent) < 30:
             continue

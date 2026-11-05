@@ -3,7 +3,7 @@
 Tomorrow's solar power, with a margin. Penumbra gives calibrated P10, P50 and P90 day-ahead forecasts, and checks them in public against the grid operator.
 
 **Live site:** https://yy5652-hash.github.io/penumbra/
-**Deck:** https://yy5652-hash.github.io/penumbra/Penumbra_DATANOVA_2026.pptx
+**Presentation:** https://yy5652-hash.github.io/penumbra/deck.html · [PowerPoint download](https://yy5652-hash.github.io/penumbra/Penumbra_DATANOVA_2026.pptx)
 Built for DATANOVA 2026, track DN-SU-01 Solar Energy Generation Forecasting.
 
 ## Results
@@ -55,9 +55,20 @@ export PYTHONPATH=src
 .venv/bin/python src/value.py test_v2
 .venv/bin/python src/download_gb.py
 .venv/bin/python src/portability.py
+# Fixed-spec D+1..D+3 experiment and browser exports
+.venv/bin/python src/download_weather.py 3
+.venv/bin/python src/download_weather.py 4
+.venv/bin/python src/horizons.py
+.venv/bin/python src/horizon_evidence.py
+.venv/bin/python src/export_site.py horizons 2026-11
+.venv/bin/python -m unittest src/test_horizons.py -q
 node --test site/test/*.test.mjs
 python3 -m http.server --directory site 8765
 ```
+
+The 14-slide browser presentation and PowerPoint use `deck/content.js`. Rebuild both with `npm ci --prefix tools` then `NODE_PATH=$PWD/tools/node_modules node deck/build.js`. The HTML deck uses inline SVG charts, arrow keys, touch navigation and one slide per printed page.
+
+For a reboot-safe round-3 run, use `.venv/bin/python tools/resume-round3.py`. Completed monthly predictions, model files and fixtures are reused. Logs and stage checkpoints are saved in `data/round3/`. Browser checks and gallery capture require a local session that can launch Playwright Chromium.
 
 On macOS without Homebrew libomp, prefix the LightGBM commands with `DYLD_LIBRARY_PATH=$PWD/.venv/lib/python3.11/site-packages/sklearn/.dylibs`. Quartz runs in its own environment: see `src/quartz_baseline.py` for the pinned versions noted in `PROGRESS.md`.
 
@@ -70,9 +81,28 @@ On macOS without Homebrew libomp, prefix the LightGBM commands with `DYLD_LIBRAR
 - Day-ahead prices: [Energy-Charts](https://energy-charts.info/).
 - Baseline: [Quartz Solar Forecast](https://github.com/openclimatefix/open-source-quartz-solar-forecast), MIT, used for comparison only.
 - Chart library: [uPlot](https://github.com/leeoniya/uPlot), MIT.
+- Figure and presentation tooling: [Matplotlib](https://matplotlib.org/) and [PptxGenJS](https://gitbrent.github.io/PptxGenJS/).
+- Browser and screenshot tooling: [Playwright](https://playwright.dev/).
 
 Development used AI coding assistants; the author reviewed the code and validated every result.
 
 ## Licence
 
 MIT. See `LICENSE`. Data remains under its own licence.
+
+<!-- horizons:start -->
+## Horizons
+
+Weather-only models. Fixed features and parameters for all horizons. 2025-05-01 to 2026-10-31. Common daylight rows: 321,625 across 549 days. Monthly refits and rolling scoped calibration use a gap of 2, 3 or 4 days. Full-day lags end before the issue day; the frozen weather specification uses no output lags. Elia is a D+1 reference only. Its score uses rows with a published day-ahead forecast.
+
+| Horizon | Scope | Pinball | MAE | Cover 80 | Width |
+|---|---|---|---|---|---|
+| D+1 | Belgium | 0.012942 | 4.19% | 79.07% | 12.28% |
+| D+1 | Provinces | 0.014479 | 4.68% | 79.47% | 13.73% |
+| D+2 | Belgium | 0.014799 | 4.80% | 78.62% | 14.01% |
+| D+2 | Provinces | 0.016258 | 5.26% | 79.29% | 15.39% |
+| D+3 | Belgium | 0.017364 | 5.54% | 79.13% | 16.99% |
+| D+3 | Provinces | 0.018541 | 5.93% | 79.67% | 18.04% |
+
+![Weather-only accuracy and band width by horizon](site/img/horizons.png)
+<!-- horizons:end -->

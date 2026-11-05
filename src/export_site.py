@@ -6,15 +6,15 @@ must reproduce them, so what users see is the same model the backtest scored.
 import json
 import shutil
 import sys
+import time
 from pathlib import Path
 
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-import requests
 
 from backtest import FROZEN, QUANTILES, TSO
-from download_weather import MODELS as NWP, URL, VARS
+from download_weather import MODELS as NWP, VARS, request_weather
 from features import weather_features
 from live import MODELS, chain_order, read_ledger
 
@@ -46,17 +46,19 @@ def flatten(tree):
     return {"r": root, "f": split, "t": thresh, "a": left, "b": right, "d": default_left, "m": miss, "v": leaves}
 
 
-def export_model(month):
+def export_model(month, horizon=1):
+    from horizons import site_boosters
     (SITE / "model").mkdir(parents=True, exist_ok=True)
-    out = {"features": FROZEN["weather"]["feats"], "month": month, "quantiles": {}}
-    for a in QUANTILES:
-        b = lgb.Booster(model_file=str(MODELS / month / f"weather_{int(a * 100)}.txt"))
+    out = {"features": FROZEN["weather"]["feats"], "month": month, "horizon": horizon, "quantiles": {}}
+    for a, b in zip(QUANTILES, site_boosters(horizon, month)):
         dump = b.dump_model()
         if dump["feature_names"] != out["features"]:
             raise ValueError("feature order changed")
         out["quantiles"][str(int(a * 100))] = {"trees": [flatten(t) for t in dump["tree_info"]]}
-    path = SITE / "model" / "weather.json"
+    path = SITE / "model" / f"weather_h{horizon}.json"
     path.write_text(json.dumps(out, separators=(",", ":")))
+    if horizon == 1:
+        shutil.copy(path, SITE / "model" / "weather.json")
     print("model bytes", path.stat().st_size)
 
 
@@ -85,16 +87,20 @@ def shifts():
     out = {"through": f"{last:%Y-%m-%d}", "days": 60, "lo": [round(float(lo.get(i, 0)), 5) for i in range(6)],
            "hi": [round(float(hi.get(i, 0)), 5) for i in range(6)]}
     (SITE / "data").mkdir(parents=True, exist_ok=True)
-    (SITE / "data" / "shifts.json").write_text(json.dumps(out))
+    path = SITE / "data" / "shifts.json"
+    if path.exists():
+        old = json.loads(path.read_text())
+        out.update({k: old[k] for k in ('h2', 'h3') if k in old})
+    path.write_text(json.dumps(out))
     return out
 
 
-def forecast_python(raw, lat, lon, month, sh):
-    feats = weather_features(raw, lat, lon)
+def forecast_python(raw, lat, lon, month, sh, horizon=1):
+    from horizons import site_boosters
+    feats = weather_features(raw, lat, lon, previous_day=horizon + 1)
     feats = feats[feats.elevation > 0]
     names = FROZEN["weather"]["feats"]
-    pr = np.column_stack([lgb.Booster(model_file=str(MODELS / month / f"weather_{int(a * 100)}.txt")).predict(feats[names])
-                          for a in QUANTILES])
+    pr = np.column_stack([b.predict(feats[names]) for b in site_boosters(horizon, month)])
     pr = np.sort(np.clip(pr, 0, None), axis=1)
     w = pr[:, 2] - pr[:, 0]
     b = (feats.elevation.values > 15).astype(int) * 3 + np.digitize(w, [0.05, 0.15])
@@ -105,28 +111,38 @@ def forecast_python(raw, lat, lon, month, sh):
     return feats, pr, p10c, p90c
 
 
-def fixtures(month, sh):
+def fixtures(month, sh, horizon=1):
     root = SITE / "test" / "fixtures"
     root.mkdir(parents=True, exist_ok=True)
-    tomorrow = pd.Timestamp.now(tz="UTC").floor("D") + pd.Timedelta(days=1)
+    tomorrow = pd.Timestamp.now(tz="UTC").floor("D") + pd.Timedelta(days=horizon)
     start, end = tomorrow - pd.Timedelta(days=1), tomorrow + pd.Timedelta(days=1)
-    hourly = [f"{v}_previous_day2" for v in VARS]
+    hourly = [f"{v}_previous_day{horizon + 1}" for v in VARS]
     for name, (lat, lon) in FIXTURE_PLACES.items():
+        suffix = '' if horizon == 1 else f'_h{horizon}'
+        path = root / f"{name}{suffix}.json"
+        if horizon > 1 and path.exists():
+            saved = json.loads(path.read_text())
+            if saved.get('shifts') == sh and saved.get('modelMonth', month) == month:
+                print(name, 'resumed fixture', flush=True)
+                continue
         params = dict(latitude=lat, longitude=lon, start_date=f"{start:%Y-%m-%d}", end_date=f"{end:%Y-%m-%d}",
                       hourly=",".join(hourly), models=",".join(NWP), timezone="UTC")
-        r = requests.get(URL, params=params, timeout=120)
-        r.raise_for_status()
-        body = r.json()
+        body = request_weather(params)
         raw = pd.DataFrame(body["hourly"])
         raw["time"] = pd.to_datetime(raw["time"], utc=True)
-        feats, pr, p10c, p90c = forecast_python(raw, lat, lon, month, sh)
+        feats, pr, p10c, p90c = forecast_python(raw, lat, lon, month, sh, horizon=horizon)
         names = FROZEN["weather"]["feats"]
-        (root / f"{name}.json").write_text(json.dumps({
+        tmp = path.with_suffix('.tmp')
+        tmp.write_text(json.dumps({
+            "horizon": horizon,
+            "modelMonth": month,
             "lat": lat, "lon": lon, "open_meteo": body, "times": feats.index.strftime("%Y-%m-%dT%H:%MZ").tolist(),
             "features": {n: [None if np.isnan(v) else float(v) for v in feats[n]] for n in names},
             "raw": {"p10": pr[:, 0].tolist(), "p50": pr[:, 1].tolist(), "p90": pr[:, 2].tolist()},
             "p10": p10c.tolist(), "p90": p90c.tolist(), "shifts": sh}, separators=(",", ":")))
+        tmp.replace(path)
         print(name, len(feats), "rows")
+        time.sleep(4)
 
 
 def copy_ledger():
@@ -141,6 +157,23 @@ def copy_ledger():
 
 def main(args):
     """`export_site.py daily` refreshes shifts and the ledger; `export_site.py YYYY-MM` also exports model and fixtures."""
+    if args[0] == 'horizons':
+        from horizons import latest_shifts
+        month = args[1] if len(args) > 1 else f"{pd.Timestamp.now(tz='UTC'):%Y-%m}"
+        path = SITE / 'data' / 'shifts.json'
+        sh = json.loads(path.read_text())
+        # Preserve the current h1 model, calibration and real parity fixtures.
+        shutil.copy(SITE / 'model' / 'weather.json', SITE / 'model' / 'weather_h1.json')
+        for horizon in (2, 3):
+            sh[f'h{horizon}'] = latest_shifts(horizon, pd.Timestamp.now(tz='UTC'))
+            export_model(month, horizon=horizon)
+            fixtures(month, sh[f'h{horizon}'], horizon=horizon)
+            latest = json.loads(path.read_text())
+            latest[f'h{horizon}'] = sh[f'h{horizon}']
+            tmp = path.with_suffix('.tmp')
+            tmp.write_text(json.dumps(latest))
+            tmp.replace(path)
+        return
     sh = shifts()
     print(sh)
     copy_ledger()

@@ -6,4 +6,10 @@ __pycache__/
 node_modules/
 .venv*/
 .cache/
+/tools/browsers/
 *.log
+/site/.Penumbra_DATANOVA_2026.building.pptx
+/site/deck.html.tmp
+/site/test/fixtures/*.tmp
+/site/data/*.tmp
+/docs/gallery/*.tmp

@@ -34,7 +34,8 @@ function interpolate(values) {
   if (previous >= 0) for (let j=previous+1; j<Math.min(values.length, previous+5); j++) out[j] = values[previous];
   return out;
 }
-export function weatherFeatures(response, lat, lon) {
+export function weatherFeatures(response, lat, lon, horizon=1) {
+  if (![1,2,3].includes(horizon)) throw new RangeError('Horizon must be 1, 2 or 3.');
   const h = response.hourly;
   if (!h?.time?.length) return [];
   const order = h.time.map((s,i) => [timestamp(s),i]).sort((a,b) => a[0]-b[0]);
@@ -50,7 +51,7 @@ export function weatherFeatures(response, lat, lon) {
   for (const [t,v] of csHours) csHours.set(t,v.reduce((a,b)=>a+b,0)/v.length);
   const clouds = [], temps = [], directs = [], ks = [];
   for (const m of MODELS) {
-    const read = (key,t) => numeric(h[`${key}_previous_day2_${m}`]?.[lookup.get(t)]);
+    const read = (key,t) => numeric(h[`${key}_previous_day${horizon+1}_${m}`]?.[lookup.get(t)]);
     clouds.push(interpolate(rows.map(r=>read('cloud_cover',r.ms))));
     temps.push(interpolate(rows.map(r=>read('temperature_2m',r.ms))));
     const km=[], dm=[];
@@ -83,8 +84,9 @@ export function calibrate(p10,p50,p90,elevation,shifts) {
   const width=p90-p10, bin=(elevation>15 ? 3 : 0)+(width>=.05 ? 1 : 0)+(width>=.15 ? 1 : 0);
   return {p10:Math.min(p50,Math.max(0,p10-shifts.lo[bin])),p50,p90:Math.max(p50,p90+shifts.hi[bin])};
 }
-export function forecast(response,lat,lon,model,shifts) {
-  return weatherFeatures(response,lat,lon).map(r=>{
+export function forecast(response,lat,lon,model,shifts,horizon=model.horizon??1) {
+  if (model.horizon && model.horizon!==horizon) throw new RangeError('Model and requested horizon differ.');
+  return weatherFeatures(response,lat,lon,horizon).map(r=>{
     const values=model.features.map(n=>r[n]);
     const raw=[10,50,90].map(q=>Math.max(0,model.quantiles[q].trees.reduce((s,t)=>s+predictTree(t,values),0))).sort((a,b)=>a-b);
     return {...r,raw:{p10:raw[0],p50:raw[1],p90:raw[2]},...calibrate(...raw,r.elevation,shifts)};

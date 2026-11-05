@@ -49,7 +49,7 @@ def load_weather(live=False):
     return df.drop_duplicates(["region", "time"], keep="last")
 
 
-def weather_features(raw, lat, lon):
+def weather_features(raw, lat, lon, previous_day=2):
     """Turn one place's hourly NWP into 15-minute features. Hourly radiation is the mean of the preceding hour."""
     raw = raw.sort_values("time").set_index("time")
     idx = pd.date_range(raw.index.min() - pd.Timedelta(hours=1), raw.index.max(), freq="15min", tz="UTC")
@@ -60,8 +60,8 @@ def weather_features(raw, lat, lon):
     cs_hour = pd.Series(cs, index=idx).groupby(label).mean()
     ks, clouds, temps, directs = [], [], [], []
     for m in MODELS:
-        ghi = raw[f"shortwave_radiation_previous_day2_{m}"].reindex(label).values.astype(float)
-        direct = raw[f"direct_radiation_previous_day2_{m}"].reindex(label).values.astype(float)
+        ghi = raw[f"shortwave_radiation_previous_day{previous_day}_{m}"].reindex(label).values.astype(float)
+        direct = raw[f"direct_radiation_previous_day{previous_day}_{m}"].reindex(label).values.astype(float)
         c_hour = cs_hour.reindex(label).values
         with np.errstate(divide="ignore", invalid="ignore"):
             k = np.where(c_hour > 20, ghi / c_hour, np.nan)
@@ -71,8 +71,8 @@ def weather_features(raw, lat, lon):
         out[f"ghi_{m}"] = k * cs
         ks.append(k)
         directs.append(d)
-        cloud = raw[f"cloud_cover_previous_day2_{m}"].astype(float)
-        temp = raw[f"temperature_2m_previous_day2_{m}"].astype(float)
+        cloud = raw[f"cloud_cover_previous_day{previous_day}_{m}"].astype(float)
+        temp = raw[f"temperature_2m_previous_day{previous_day}_{m}"].astype(float)
         clouds.append(cloud.reindex(idx).interpolate(limit=4).values)
         temps.append(temp.reindex(idx).interpolate(limit=4).values)
     ks, clouds, temps, directs = map(np.array, (ks, clouds, temps, directs))
@@ -165,27 +165,31 @@ def gfs_features(gf, place, feats):
                                                  "cloud_gfs": out["cloud3"].reindex(label).values})
 
 
-def add_lags(g):
-    """Lags that exist at 11:00 D-1. D-2 is the last complete day, 192 quarter-hours back."""
+def add_lags(g, horizon=1):
+    """Full-day lags end before the issue day: target minus horizon+1 days.
+
+    The morning features refer to the issue morning; the weather-only spec uses no lags.
+    """
     g = g.sort_values("datetime").set_index("datetime")
     g = g.asfreq("15min")
-    g["cf_d2"] = g["cf"].shift(192)
+    lag = horizon + 1
+    g["cf_d2"] = g["cf"].shift(96 * lag)
     daily_cf = g["cf"].where(g["clear_sky"] > 20).resample("D").sum(min_count=8)
     daily_cs = g["clear_sky"].where(g["clear_sky"] > 20).resample("D").sum(min_count=8)
-    ratio = (daily_cf.rolling(7, min_periods=4).sum() / daily_cs.rolling(7, min_periods=4).sum()).shift(2) * 1000
+    ratio = (daily_cf.rolling(7, min_periods=4).sum() / daily_cs.rolling(7, min_periods=4).sum()).shift(lag) * 1000
     g["perf7"] = ratio.reindex(g.index.floor("D")).values
     # Trailing TSO error at the same quarter-hour, from D-2 back to D-8.
     err = g["cf"] - g["tso_p50"]
-    g["tso_err7"] = pd.concat([err.shift(96 * k) for k in range(2, 9)], axis=1).mean(axis=1)
-    g["tso_abs7"] = pd.concat([err.abs().shift(96 * k) for k in range(2, 9)], axis=1).mean(axis=1)
+    g["tso_err7"] = pd.concat([err.shift(96 * k) for k in range(lag, lag + 7)], axis=1).mean(axis=1)
+    g["tso_abs7"] = pd.concat([err.abs().shift(96 * k) for k in range(lag, lag + 7)], axis=1).mean(axis=1)
     # D-1 morning, 06:00 to 08:00 UTC: measured before the cutoff (09:00 UTC in summer, 10:00 in winter).
     morning = (g.index.hour >= 6) & (g.index.hour < 8)
     day_cf = g["cf"].where(morning).resample("D").sum(min_count=4)
     day_tso = g["tso_p50"].where(morning).resample("D").sum(min_count=4)
     with np.errstate(divide="ignore", invalid="ignore"):
-        ratio = (day_cf / day_tso.where(day_tso > 0.02)).shift(1)
+        ratio = (day_cf / day_tso.where(day_tso > 0.02)).shift(horizon)
     g["m_ratio1"] = ratio.reindex(g.index.floor("D")).values
-    g["m_err1"] = ((day_cf - day_tso) / 8).shift(1).reindex(g.index.floor("D")).values
+    g["m_err1"] = ((day_cf - day_tso) / 8).shift(horizon).reindex(g.index.floor("D")).values
     return g.reset_index()
 
 

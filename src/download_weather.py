@@ -21,28 +21,46 @@ PLACES = {
 }
 
 
-def fetch(place, lat, lon, start, end, out):
-    hourly = [f"{v}_previous_day{d}" for v in VARS for d in (1, 2)]
-    params = dict(latitude=lat, longitude=lon, start_date=start, end_date=end,
-                  hourly=",".join(hourly), models=",".join(MODELS), timezone="UTC")
+def request_weather(params):
+    """Shared bounded retry policy for archives and real-response parity fixtures."""
     for attempt in range(6):
-        r = requests.get(URL, params=params, timeout=120)
+        try:
+            r = requests.get(URL, params=params, timeout=120)
+        except (requests.Timeout, requests.ConnectionError):
+            if attempt == 5:
+                raise
+            time.sleep(4 * (attempt + 1))
+            continue
         if r.status_code == 429:
             print("rate limited, sleeping", flush=True)
             time.sleep(70 * (attempt + 1))
             continue
         r.raise_for_status()
-        df = pd.DataFrame(r.json()["hourly"])
-        df["time"] = pd.to_datetime(df["time"], utc=True)
-        df["region"] = place
-        tmp = out.with_suffix(".tmp")
-        df.to_parquet(tmp)
-        tmp.rename(out)
-        return
-    raise RuntimeError(f"gave up on {place} {start}")
+        try:
+            body = r.json()
+        except requests.exceptions.JSONDecodeError:
+            if attempt == 5:
+                raise
+            print("invalid JSON, retrying", params.get('start_date'), flush=True)
+            time.sleep(4 * (attempt + 1))
+            continue
+        return body
+    raise RuntimeError(f"gave up on weather request starting {params.get('start_date')}")
 
 
-def main(places=PLACES, end="2026-10-26", folder="data/weather"):
+def fetch(place, lat, lon, start, end, out, previous_days=(1, 2)):
+    hourly = [f"{v}_previous_day{d}" for v in VARS for d in previous_days]
+    params = dict(latitude=lat, longitude=lon, start_date=start, end_date=end,
+                  hourly=",".join(hourly), models=",".join(MODELS), timezone="UTC")
+    df = pd.DataFrame(request_weather(params)["hourly"])
+    df["time"] = pd.to_datetime(df["time"], utc=True)
+    df["region"] = place
+    tmp = out.with_suffix(".tmp")
+    df.to_parquet(tmp)
+    tmp.rename(out)
+
+
+def main(places=PLACES, end="2026-10-26", folder="data/weather", previous_days=(1, 2)):
     root = Path(folder)
     root.mkdir(parents=True, exist_ok=True)
     starts = pd.date_range("2024-01-01", end, freq="QS")
@@ -51,11 +69,19 @@ def main(places=PLACES, end="2026-10-26", folder="data/weather"):
             e = min(s + pd.offsets.QuarterEnd(0), pd.Timestamp(end))
             out = root / f"{place}_{s:%Y%m%d}.parquet"
             if out.exists():
-                continue
-            fetch(place, lat, lon, f"{s:%Y-%m-%d}", f"{e:%Y-%m-%d}", out)
+                latest = pd.read_parquet(out, columns=['time']).time.max()
+                if pd.notna(latest) and latest.date() >= e.date():
+                    continue
+            fetch(place, lat, lon, f"{s:%Y-%m-%d}", f"{e:%Y-%m-%d}", out, previous_days)
             print("ok", out.name, flush=True)
             time.sleep(4)
 
 
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:]:
+        day = int(sys.argv[1])
+        if day not in (3, 4):
+            raise SystemExit("Use 3 or 4 for the additional horizon archives")
+        main(end=f"{pd.Timestamp.now(tz='UTC'):%Y-%m-%d}", folder=f"data/weather_h{day}", previous_days=(day,))
+    else:
+        main()

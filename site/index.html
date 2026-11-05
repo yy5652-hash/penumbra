@@ -13,7 +13,7 @@
 <header class="masthead wrap"><a class="brand" href="index.html" aria-label="Penumbra home"><span class="mark" aria-hidden="true"></span>penumbra<span class="brand-note">SOLAR FORECASTS</span></a><nav aria-label="Main"><a href="#ledger">Ledger</a><a href="#evidence">Evidence</a><a href="how.html">How it works</a></nav></header>
 <main id="main" class="wrap">
 <section id="forecast" class="forecast-section" aria-labelledby="forecast-heading">
-<div class="section-top"><div><p class="eyebrow">01 / FORECAST TOOL</p><h1 id="forecast-heading">Tomorrow, with a margin.</h1><p class="intro">Solar power forecasts that show the uncertainty. No account. No API key.</p></div><span class="tag">Free · Runs in your browser</span></div>
+<div class="section-top"><div><p class="eyebrow">01 / FORECAST TOOL</p><h1 id="forecast-heading">Solar, with a margin.</h1><p class="intro">Solar power forecasts that show the uncertainty. No account. No API key.</p></div><span class="tag">Free · Runs in your browser</span></div>
 <div class="instrument">
 <aside class="controls">
 <form id="search-form"><label for="place">Find a place</label><div class="input-action"><input id="place" type="search" placeholder="City or postcode" autocomplete="off" minlength="2" required><button type="submit">Search</button></div></form>
@@ -21,15 +21,16 @@
 <button id="locate" class="secondary full" type="button">Use my location</button>
 <form id="forecast-form">
 <fieldset><legend>Or enter coordinates</legend><div class="pair"><div><label for="latitude">Latitude</label><input id="latitude" type="number" min="-90" max="90" step="any" value="50.85" required></div><div><label for="longitude">Longitude</label><input id="longitude" type="number" min="-180" max="180" step="any" value="4.37" required></div></div></fieldset>
+<label for="horizon">Forecast horizon</label><select id="horizon"><option value="1">Tomorrow</option><option value="2">In 2 days</option><option value="3">In 3 days</option></select>
 <label for="capacity">Installed capacity</label><div class="capacity-input"><input id="capacity" type="number" min="0.001" max="1000000000" step="any" value="5" required><label class="sr-only" for="unit">Capacity unit</label><select id="unit"><option value="kW">kW</option><option value="MW">MW</option></select></div>
 <p class="fine">Assumes a typical fleet mix. Tilt and orientation are not modelled.</p>
-<button class="full" type="submit" id="run">Forecast tomorrow</button>
+<button class="full" type="submit" id="run">Forecast</button>
 </form>
 <p id="location-name" class="location-name">Brussels, Belgium · example location</p>
 <p class="fine">Coordinates go directly to Open-Meteo. Nothing goes to us. <a href="terms.html">Privacy</a></p>
 </aside>
 <div class="output">
-<div class="output-top"><div><p class="eyebrow">NEXT-DAY OUTLOOK</p><h2 id="result-title">Brussels, Belgium</h2><p id="result-date" class="fine">Tomorrow · local time</p></div><span id="model-version" class="tag">Weather-only model</span></div>
+<div class="output-top"><div><p class="eyebrow">SOLAR OUTLOOK</p><h2 id="result-title">Brussels, Belgium</h2><p id="result-date" class="fine">Tomorrow · local time</p></div><span id="model-version" class="tag">Weather-only model</span></div>
 <div class="status-row"><p id="forecast-status" role="status" aria-live="polite">Preparing your forecast…</p><button id="retry" class="secondary" type="button" hidden>Retry forecast</button></div>
 <p id="region-notice" class="notice" hidden>This model was trained in Belgium and tested in Great Britain. Treat results elsewhere as a first estimate.</p>
 <div id="forecast-result" hidden>
@@ -53,6 +54,6 @@
 <section id="evidence" class="section" aria-labelledby="evidence-heading"><p class="eyebrow">03 / EVIDENCE</p><h2 id="evidence-heading">Measured. Not promised.</h2><p class="section-intro">Frozen v2 results across 359 test days, and a separate weather-only check across the Channel.</p><div id="evidence-content" aria-live="polite"><p>Loading published results…</p></div><button id="evidence-retry" class="secondary" type="button" hidden>Retry evidence</button></section>
 <section id="pricing" class="section pricing"><div><p class="eyebrow">04 / ACCESS</p><h2>Free today.</h2><p>The forecast tool, CSV and JSON exports, and the public ledger.</p></div><div><h3>Pro: API, alerts, many sites: not available yet.</h3><p>No checkout. No waiting-list promises.</p><a class="button secondary" href="https://github.com/yy5652-hash/penumbra/issues">Discuss Pro on GitHub →</a></div></section>
 </main>
-<footer class="wrap"><a class="brand" href="index.html">penumbra</a><p>Weather data by <a href="https://open-meteo.com/">Open-Meteo.com</a>, CC BY 4.0<br>Solar data: Elia Open Data · Sheffield Solar PV_Live</p><nav aria-label="Footer"><a href="how.html">Method &amp; sources</a><a href="terms.html">Terms &amp; privacy</a></nav></footer>
+<footer class="wrap"><a class="brand" href="index.html">penumbra</a><p>Weather data by <a href="https://open-meteo.com/">Open-Meteo.com</a>, CC BY 4.0<br>Solar data: Elia Open Data · Sheffield Solar PV_Live</p><nav aria-label="Footer"><a href="deck.html">Presentation</a><a href="Penumbra_DATANOVA_2026.pptx" download>PowerPoint download</a><a href="how.html">Method &amp; sources</a><a href="terms.html">Terms &amp; privacy</a></nav></footer>
 <noscript><p class="wrap notice">JavaScript is needed to calculate forecasts and verify the ledger. Read <a href="how.html">the method</a> or inspect the <a href="ledger/index.json">ledger files</a>.</p></noscript>
 </body></html>
