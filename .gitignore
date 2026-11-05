@@ -21,3 +21,4 @@ PROGRESS.md
 docs/codex_*.md
 docs/site_brief.md
 tools/node_modules/
+.publish_enabled
