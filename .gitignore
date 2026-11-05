@@ -13,3 +13,11 @@ node_modules/
 /site/test/fixtures/*.tmp
 /site/data/*.tmp
 /docs/gallery/*.tmp
+CLAUDE.md
+COMPETITION_ANALYSIS.md
+COMPETITOR_ANALYSIS.md
+PLAN.md
+PROGRESS.md
+docs/codex_*.md
+docs/site_brief.md
+tools/node_modules/
