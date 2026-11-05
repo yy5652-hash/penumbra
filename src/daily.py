@@ -6,6 +6,7 @@ Safe to run many times a day and after every boot.
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,6 +17,7 @@ if os.environ.get("DYLD_LIBRARY_PATH") != str(OMP):
     os.execve(sys.executable, [sys.executable, *sys.argv], {**os.environ, "DYLD_LIBRARY_PATH": str(OMP)})
 
 import export_site  # noqa: E402
+import requests  # noqa: E402
 import live  # noqa: E402
 
 
@@ -25,7 +27,16 @@ def git(*args):
 
 def main():
     print(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), "start", flush=True)
-    live.run()
+    # Right after a boot the network may not be up yet: retry for about ten minutes before giving up.
+    for attempt in range(5):
+        try:
+            live.run()
+            break
+        except requests.ConnectionError as exc:
+            print("network not ready:", str(exc)[:120], flush=True)
+            if attempt == 4:
+                raise
+            time.sleep(120)
     export_site.main(["daily"])
     git("add", "ledger", "site/ledger", "site/data/shifts.json")
     if git("diff", "--cached", "--quiet").returncode:
