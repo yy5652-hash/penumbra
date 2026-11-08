@@ -5,7 +5,7 @@ import {forecast,quantileAt,predictTree,calibrate,weatherFeatures,MODELS} from '
 const read=async path=>JSON.parse(await readFile(new URL(path,import.meta.url),'utf8'));
 const model=await read('../model/weather.json'), shifts=await read('../data/shifts.json');
 const close=(a,b,label)=>{ if(b===null) assert.ok(Number.isNaN(a),label); else assert.ok(Number.isFinite(a)&&Math.abs(a-b)<=1e-4,`${label}: ${a} vs ${b}`); };
-for (const file of (await readdir(new URL('fixtures/',import.meta.url))).sort()) {
+for (const file of (await readdir(new URL('fixtures/',import.meta.url),{withFileTypes:true})).filter(f=>f.isFile()&&f.name.endsWith('.json')).map(f=>f.name).sort()) {
   test(`Python parity: ${file}`,async()=>{
     const f=await read(`fixtures/${file}`), horizon=f.horizon??1;
     const m=horizon===1?model:await read(`../model/weather_h${horizon}.json`);

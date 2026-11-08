@@ -1,0 +1,109 @@
+{
+  "source": "https://geocoding-api.open-meteo.com/v1/search?name=Brussels&count=5&language=en&format=json",
+  "response": {
+    "results": [
+      {
+        "id": 2800866,
+        "name": "Brussels",
+        "latitude": 50.85045,
+        "longitude": 4.34878,
+        "elevation": 28.0,
+        "feature_code": "PPLC",
+        "country_code": "BE",
+        "admin1_id": 2800867,
+        "admin2_id": 6693370,
+        "admin3_id": 2800865,
+        "timezone": "Europe/Brussels",
+        "population": 1019022,
+        "postcodes": [
+          "1000"
+        ],
+        "country_id": 2802361,
+        "country": "Belgium",
+        "admin1": "Brussels Capital",
+        "admin2": "Bruxelles-Capitale",
+        "admin3": "Arrondissement Brussel-Hoofdstad"
+      },
+      {
+        "id": 4833850,
+        "name": "Brussels",
+        "latitude": 44.73611,
+        "longitude": -87.62093,
+        "elevation": 233.0,
+        "feature_code": "PPL",
+        "country_code": "US",
+        "admin1_id": 5279468,
+        "admin2_id": 5250768,
+        "admin3_id": 5247021,
+        "timezone": "America/Chicago",
+        "population": 1110,
+        "postcodes": [
+          "54204"
+        ],
+        "country_id": 6252001,
+        "country": "United States",
+        "admin1": "Wisconsin",
+        "admin2": "Door",
+        "admin3": "Town of Brussels"
+      },
+      {
+        "id": 4234671,
+        "name": "Brussels",
+        "latitude": 38.94949,
+        "longitude": -90.58873,
+        "elevation": 159.0,
+        "feature_code": "PPL",
+        "country_code": "US",
+        "admin1_id": 4896861,
+        "admin2_id": 4235018,
+        "timezone": "America/Chicago",
+        "population": 136,
+        "postcodes": [
+          "62013"
+        ],
+        "country_id": 6252001,
+        "country": "United States",
+        "admin1": "Illinois",
+        "admin2": "Calhoun"
+      },
+      {
+        "id": 5910322,
+        "name": "Brussels",
+        "latitude": 43.74316,
+        "longitude": -81.24998,
+        "elevation": 342.0,
+        "feature_code": "PPL",
+        "country_code": "CA",
+        "admin1_id": 6093943,
+        "admin2_id": 5978829,
+        "admin3_id": 13680322,
+        "timezone": "America/Toronto",
+        "population": 1158,
+        "country_id": 6251999,
+        "country": "Canada",
+        "admin1": "Ontario",
+        "admin2": "Huron County",
+        "admin3": "Huron East"
+      },
+      {
+        "id": 4378877,
+        "name": "Brussells",
+        "latitude": 39.05088,
+        "longitude": -90.87902,
+        "elevation": 192.0,
+        "feature_code": "PPL",
+        "country_code": "US",
+        "admin1_id": 4398678,
+        "admin2_id": 4395330,
+        "admin3_id": 4409266,
+        "timezone": "America/Chicago",
+        "country_id": 6252001,
+        "country": "United States",
+        "admin1": "Missouri",
+        "admin2": "Lincoln",
+        "admin3": "Snow Hill Township"
+      }
+    ],
+    "generationtime_ms": 0.22935867
+  }
+}

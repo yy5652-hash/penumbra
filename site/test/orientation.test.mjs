@@ -7,7 +7,9 @@ const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-12,`${a} vs ${b}`);
 const sun=(time,lat=52.2,lon=.12)=>{const ms=Date.parse(time);return {ms,...solarPosition(ms,lat,lon)};};
 
 test('Default tilt and south orientation leave every horizon and fixture exactly unchanged',async()=>{
-  for(const file of await readdir(new URL('fixtures/',import.meta.url))) {
+  for(const entry of await readdir(new URL('fixtures/',import.meta.url),{withFileTypes:true})) {
+    if(!entry.isFile()||!entry.name.endsWith('.json'))continue;
+    const file=entry.name;
     const f=await read(`fixtures/${file}`),h=f.horizon??1,m=await read(`../model/weather_h${h}.json`);
     const rows=forecast(f.open_meteo,f.lat,f.lon,m,f.shifts,h),before=structuredClone(rows);
     assert.deepEqual(adjustOrientation(rows),before,file);

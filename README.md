@@ -1,10 +1,20 @@
 # Penumbra
 
-Tomorrow's solar power, with a margin. Penumbra gives calibrated P10, P50 and P90 day-ahead forecasts, and checks them in public against the grid operator.
+**Solar, with a margin.** Penumbra tells you how much solar power you can count on. Drop a pin, describe your roof, and get a calibrated P10–P90 range for today and the next three days, the hours you can rely on most, and how much you can safely commit at the risk you choose. Free, no account, installable on a phone, and the model runs on your device.
+
+For Belgium, Penumbra forecasts the national fleet every day next to Elia, the grid operator, and scores both in a public, hash-chained ledger. On 359 unseen days it cut pinball loss by **10.8%** against Elia's own probabilistic forecast, with a band almost a third narrower (**9.1% vs 13.3%** of capacity) while still covering **80%** of outcomes.
 
 **Live site:** https://yy5652-hash.github.io/penumbra/
 **Presentation:** https://yy5652-hash.github.io/penumbra/deck.html · [PowerPoint download](https://yy5652-hash.github.io/penumbra/Penumbra_DATANOVA_2026.pptx)
 Built for DATANOVA 2026, track DN-SU-01 Solar Energy Generation Forecasting.
+
+## Use it
+
+1. **Pick a place**: map, search, GPS or an example. A forecast appears straight away for a default 5 kW, 35° south roof.
+2. **Describe your roof**: up to three arrays (for example east and west), each with capacity, tilt and direction, plus an optional inverter limit. Orientation uses Open-Meteo's forecast irradiance on the tilted plane.
+3. **Read the range**: Today, Tomorrow, In 2 days, In 3 days; P10, P50 and P90 energy; a 15-minute chart; the most reliable hours to run the washing machine or charge the car.
+4. **Commit**: the risk slider turns the band into a number you can promise.
+5. **Keep it**: save sites on this device, share a link, export CSV or JSON, install the app; the last forecast stays readable offline.
 
 ## Results
 
@@ -31,7 +41,15 @@ Built for DATANOVA 2026, track DN-SU-01 Solar Energy Generation Forecasting.
 
 The test window was used twice: first by v1, then by v2, which was chosen on validation and frozen in 6e8d5b8 before its single run. The first frozen version was v1 (`2d11d22`).
 
-The tool on the site uses a second model that needs only coordinates and capacity. It runs in the browser, so coordinates go from the visitor to Open-Meteo and nothing reaches us. Optional panel tilt (0–90°) and compass direction apply a geometric adjustment to each quarter-hour's P10/P50/P90. The clear-sky plane-of-array irradiance ratio uses an isotropic sky and a 35° south reference. Those default settings leave the fleet forecast unchanged. See [the method](site/how.html#plant-geometry).
+### Forecast tool, technical notes
+
+The tool runs its weather-only model in the browser. Pick a place by map, search, GPS or example chip to get a default 5 kW, 35° south array. Today (remaining hours) uses the D+1 model and shifts; tomorrow through D+3 retain their original models. Daily cards show summed P10/P50/P90 energy, and the best 2–3 hours tomorrow maximise P10 energy. These sums are not calibrated daily quantiles or guarantees.
+
+Up to three named arrays share kW or MW units. Each array scales the calibrated fleet shape by capacity and the Open-Meteo forecast GTI ratio to 35° south, bounded to [0, 3] (1 below 20 W/m² reference GTI); hourly backward means align to each quarter-hour’s enclosing hour. The site sum is then clipped at the optional inverter AC limit. A single default array skips the orientation adjustment entirely and keeps the previous numbers exactly. Failed GTI requests use the existing clear-sky ratio with a visible note. No extra temperature derating is added. The multi-array and AC-clipping approach is adapted from [rany2/open-meteo-solar-forecast](https://github.com/rany2/open-meteo-solar-forecast) (MIT; [licence](site/vendor/open-meteo-solar-forecast.LICENSE)). [Method and limitations](site/how.html#plant-geometry).
+
+My sites saves, renames and deletes local device configurations with tomorrow previews. Old share links remain valid; new links include arrays and AC limits. CSV/JSON include best hours and array settings. The PWA uses relative scope for `/penumbra/`, caches the app shell, downloaded models and weather, and shows the last opened forecast offline with its save time. Storage failures do not prevent a forecast or share link. Map: vendored [Leaflet 1.9.4](https://leafletjs.com/reference-1.9.4.html), BSD-2-Clause, [licence](site/vendor/leaflet/LICENSE); tiles © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright). GTI parameters follow the [Open-Meteo Forecast API](https://open-meteo.com/en/docs): azimuth 0° south, −90° east, +90° west.
+
+V3 browser acceptance (Playwright 1.64.1, installed under `tools/`): `node tools/check-v3.mjs`. It serves the actual `/penumbra/` sub-path, uses recorded weather/GTI fixtures, verifies offline reload with a service worker, and writes 375/1440 px screenshots of each main screen under `data/v3-shots/`. Use `--shots-dir /tmp/penumbra-v3-shots` to keep verification output outside protected data directories.
 
 ## Public ledger
 
@@ -83,6 +101,8 @@ On macOS without Homebrew libomp, prefix the LightGBM commands with `DYLD_LIBRAR
 - Day-ahead prices: [Energy-Charts](https://energy-charts.info/).
 - Baseline: [Quartz Solar Forecast](https://github.com/openclimatefix/open-source-quartz-solar-forecast), MIT, used for comparison only.
 - Chart library: [uPlot](https://github.com/leeoniya/uPlot), MIT.
+- Map: [Leaflet](https://github.com/Leaflet/Leaflet), BSD-2-Clause; map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, ODbL.
+- Multi-array and inverter-clipping approach adapted from [rany2/open-meteo-solar-forecast](https://github.com/rany2/open-meteo-solar-forecast), MIT.
 - Figure and presentation tooling: [Matplotlib](https://matplotlib.org/) and [PptxGenJS](https://gitbrent.github.io/PptxGenJS/).
 - Browser and screenshot tooling: [Playwright](https://playwright.dev/).
 
