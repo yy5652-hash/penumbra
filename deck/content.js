@@ -173,7 +173,7 @@ s.addNotes(horizonEvidence.note + '\n' + horizonEvidence.rows.map(r => r.join(' 
 pres.addSection({ title: "Product" });
 s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Product" });
 s.addText("A working forecast in under 15 seconds, with no sign-up", { placeholder: "title" });
-s.addImage({ path: "deck/img/tool_panel.png", x: 0.6, y: 1.7, w: 7.6, h: 4.67, altText: "Penumbra forecast tool showing Cambridge with a P10 to P90 band", objectName: "Tool screenshot" });
+s.addImage({ path: "deck/img/tool_panel.png", x: 0.6, y: 1.7, w: 7.6, h: 4.67, altText: "Penumbra forecast tool for Cambridge with east and west roof arrays and a P10 to P90 band", objectName: "Tool screenshot" });
 text(s, [
   { text: "Any place: map, search, GPS or coordinates; up to three panel arrays", options: { bullet: { indent: 14 }, breakLine: true } },
   { text: "Model runs in the browser; coordinates go only to the weather API", options: { bullet: { indent: 14 }, breakLine: true } },
@@ -188,7 +188,7 @@ s.addNotes("Open the site, search for a place, move the slider. Each array is sc
 // 10
 s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Product" });
 s.addText("Every forecast goes on a public ledger, next to Elia's", { placeholder: "title" });
-s.addImage({ path: "deck/img/ledger_chart.png", x: 0.6, y: 1.7, w: 7.6, h: 3.27, altText: "Ledger chart comparing Penumbra and Elia for Belgium on 3 November 2026", objectName: "Ledger screenshot" });
+s.addImage({ path: "deck/img/ledger_chart.png", x: 0.6, y: 1.7, w: 7.6, h: 3.27, altText: "Live ledger chart comparing Penumbra and Elia for Belgium on 9 November 2026", objectName: "Ledger screenshot" });
 text(s, "Each morning after Elia's 11:00 forecast, Penumbra issues tomorrow's forecast. The next day it is scored automatically.", { x: 0.6, y: 5.2, w: 7.6, h: 1.3, fontSize: 16, objectName: "Ledger caption" });
 text(s, [
   { text: "Hash-chained: ", options: { bold: true } }, { text: "each file holds the hash of the one before, and your browser checks the chain", options: { breakLine: true } },
