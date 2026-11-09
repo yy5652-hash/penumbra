@@ -8,7 +8,7 @@ import {createServer} from 'node:http';
 import {readFile,mkdir,mkdtemp,rm} from 'node:fs/promises';
 import {resolve,extname,join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {recentScores,scoreMeans} from '../site/site-state.js';
+import {recentScores,scoreMeans,loadWindow,ledgerModelVersion} from '../site/site-state.js';
 const root=resolve('site'),flag=process.argv.indexOf('--shots-dir');
 const shots=resolve(flag<0?'data/v3-shots':process.argv[flag+1]);
 const fixtures=resolve(root,'test/fixtures'),read=async p=>JSON.parse(await readFile(p,'utf8'));
@@ -56,13 +56,13 @@ try {
       const boxes=await Promise.all(selectors.map(selector=>page.locator(selector).boundingBox()));
       for(let i=1;i<boxes.length;i++)assert.ok(boxes[i].y>=boxes[i-1].y+boxes[i-1].height-1,`${viewportWidth}px order: ${selectors[i-1]} before ${selectors[i]}`);
       const place=await page.locator('#search-form').boundingBox(),output=await page.locator('.output').boundingBox();
-      if(viewportWidth>650)assert.ok(output.x>=place.x+place.width,'Desktop forecast stays beside the controls');
+      if(viewportWidth>650)assert.ok(output.x>=place.x+place.width,`Desktop forecast stays beside the controls at ${viewportWidth}px: place ${JSON.stringify(place)} output ${JSON.stringify(output)}`);
       await page.locator('.examples button').last().focus();await page.keyboard.press('Tab');
       await expect(viewportWidth<=650?page.locator('#save-site'):page.locator('#map-picker summary')).toBeFocused();
     };
     const shot=async(name,selector='.forecast-section')=>{await layout();await page.locator(selector).screenshot({path:join(shots,`${width}-${name}.png`),animations:'disabled'});};
     const ready=async()=>{
-      await expect(page.locator('#forecast-status')).toHaveText(/^Ready/,{timeout:60000});
+      await expect(page.locator('#forecast-status')).toHaveText(/^Weather fetched /,{timeout:60000});
       await expect(page.locator('#run')).toBeEnabled({timeout:60000});
       await expect(page.locator('#forecast-result')).toBeVisible();
       await expect(page.locator('#day-totals')).not.toContainText('Loading');
@@ -76,7 +76,7 @@ try {
     await expect(page.locator('#my-sites')).toBeHidden();await expect(page.locator('#azimuth')).toBeHidden();
     assert.equal(await page.locator('#map-picker').evaluate(el=>el.open),width>=900);
     await expect(page.locator('h1')).toHaveText('Plan your day around reliable solar power.');
-    await expect(page.locator('.intro')).toHaveText('Calibrated P10–P90 solar forecasts for any roof, up to three days ahead. Free, no account.');
+    await expect(page.locator('.intro')).toHaveText('Calibrated P10–P90 solar forecasts with an honest range for your panels, up to three days ahead. Free, no account.');
     assert.deepEqual(await page.locator('.masthead nav a,.masthead nav button').allTextContents(),['Forecast','Track record','Method','Install app']);
     await page.locator('#install-app').click();await expect(page.locator('#install-help')).toContainText('Add to Home Screen');
     await page.locator('#install-app').click();await expect(page.locator('#install-help')).toBeHidden();
@@ -85,10 +85,10 @@ try {
     await page.locator('#install-app').click();assert.equal(await page.evaluate(()=>window.installCalls),1);
     await forecastOrder(width);
     // Check both sides of the phone breakpoint, including DOM/keyboard order after resizing.
-    if(width===375){for(const viewportWidth of [650,651,375]){await page.setViewportSize({width:viewportWidth,height:1000});await forecastOrder(viewportWidth);await layout();}}
+    if(width===375){for(const viewportWidth of [650,651,375]){await page.setViewportSize({width:viewportWidth,height:1000});await page.waitForFunction(w=>(document.querySelector('.output').parentElement.classList.contains('instrument'))===(w>650),viewportWidth);await forecastOrder(viewportWidth);await layout();}}
     await expect(page.locator('#pricing>div').first()).toHaveText('04 / ACCESSFree today.The forecast tool, CSV and JSON exports, and the public ledger.');
     await expect(page.locator('#pricing h3')).toHaveText('Pro · planned:');
-    await expect(page.locator('#pricing>div').last().locator('p')).toHaveText("daily email of your sites' forecasts, an API, alerts when tomorrow drops below your P10 commitment.");
+    await expect(page.locator('#pricing>div').last().locator('p')).toHaveText("daily email of your sites' forecasts, an API, alerts based on your low-case forecast.");
     await expect(page.locator('#pricing a')).toHaveText('Tell us what you need →');
     await expect(page.locator('#pricing a')).toHaveAttribute('href','https://github.com/yy5652-hash/penumbra/issues');
     await expect(page.locator('#pricing')).not.toContainText(/not available|no checkout/i);
@@ -102,12 +102,28 @@ try {
     assert.equal(ledgerRows.length,ledgerIndex.days.length*2);assert.equal(new Set(ledgerRows).size,ledgerRows.length);
     const dates=ledgerRows.map(row=>row.slice(0,10));assert.deepEqual(dates,[...dates].sort().reverse());
     await archive.locator('summary').click();
+    await expect(page.locator('#setup-summary')).toHaveText('Example setup · 5 kW · S');
+    await expect(page.locator('#best-heading')).toHaveText('Best solar window · Fri 6 Nov');
+    await expect(page.locator('#best-window')).toContainText('ranked on the low case');
+    await expect(page.locator('label[for=risk]')).toHaveText('Planning margin');
+    await expect(page.locator('#risk-value')).toHaveText('90% margin');
+    await expect(page.locator('#commitment')).toHaveText(/^Conservative plan for the day: .+ kWh, peak .+ kW$/);
+    await expect(page.locator('.totals span')).toHaveText(['Low (P10)','Expected (P50)','High (P90)']);
+    await expect(page.locator('#share')).toHaveText('Share these settings');
+    await expect(page.locator('#chain-status')).toContainText('Chain verified');
+    await expect(page.locator('#chain-status')).toContainText('15 files');
+    const published=await Promise.all(ledgerIndex.days.map(date=>read(join(root,'ledger',`${date}.json`))));
+    for(const doc of published){
+      const row=page.locator('#ledger-table tbody tr,#ledger-archive-table tbody tr').filter({hasText:`${doc.target_date} / ${doc.issued_at}`}).filter({hasText:'Penumbra grid'});
+      await expect(row).toHaveCount(1);await expect(row).toContainText(`Penumbra grid ${ledgerModelVersion(doc)}`);
+    }
+    if(width===375){await page.locator('#array-settings').evaluate(el=>el.open=false);await page.locator('#mobile-setup-summary').click();await expect(page.locator('#array-settings')).toHaveAttribute('open');}
     await shot('first-run');
     // Step 1: search a place. Step 2: select it. Forecast needs no panel setup.
     await page.locator('#place').fill('Brussels');await page.locator('#search-form button').click();
     await page.locator('#search-results button').first().click();await ready();
     assert.equal(await page.locator('#capacity').inputValue(),'5');assert.equal(await page.locator('#tilt').inputValue(),'35');assert.equal(await page.locator('#azimuth').inputValue(),'180');
-    await expect(page.locator('#example-label')).toBeHidden();await expect(page.locator('#best-hours')).toContainText('at least');
+    await expect(page.locator('#example-label')).toBeHidden();await expect(page.locator('#best-hours')).toContainText('low case');
     await expect(page.locator('#score-card table')).toHaveCount(0);await expect(page.locator('.score-dot')).toHaveCount(liveDays.length);
     const decimal=(v,d)=>v.toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d});
     await expect(page.locator('#score-status')).toHaveText(liveMean?`Last ${liveDays.length} live days · Penumbra pinball ${decimal(liveMean.grid.pinball,4)} vs Elia ${decimal(liveMean.elia.pinball,4)} · band coverage ${decimal(liveMean.grid.cover*100,1)}% vs ${decimal(liveMean.elia.cover*100,1)}%`:'No live scored days yet.');
@@ -137,11 +153,31 @@ try {
     assert.ok(requests.some(u=>u.hostname==='api.open-meteo.com'&&u.searchParams.get('azimuth')==='-90'));
     await expect(page.locator('#ac-limit')).toBeHidden();await page.locator('#advanced-settings summary').click();await change('#ac-limit','0.25');
     const clipped=JSON.parse(await exported('#json'));assert.equal(clipped.arrays.length,3);assert.equal(clipped.acLimit,.25);assert.ok(clipped.rows.every(r=>r.p10<=r.p50&&r.p50<=r.p90&&r.p90<=.25));assert.ok(clipped.rows.some(r=>r.p90===.25));assert.ok(clipped.bestHours.energy>0);
-    assert.match(await exported('#csv'),/best_hours_start_utc/);await shot('arrays');
+    assert.match(await exported('#csv'),/best_hours_start_utc/);
+    await expect(page.locator('#setup-summary')).toHaveText('15 kW · 3 arrays · S + E + W · AC limit 0.25 kW');
+    await page.locator('#load-planner summary').click();await expect(page.locator('#load-power')).toHaveValue('');await expect(page.locator('#load-duration')).toHaveValue('2');
+    await expect(page.locator('#load-result')).toBeHidden();
+    await page.locator('#load-power').fill('2');
+    const expectedLoad=loadWindow(clipped.rows.map(r=>({...r,ms:Date.parse(r.time)})),2,2);
+    await expect(page.locator('#load-result')).toContainText(`low case covers ${decimal(Math.min(expectedLoad.energy,4),1)} of 4.0 kWh (${decimal(expectedLoad.lowShare*100,0)}%)`);
+    await expect(page.locator('#load-result')).toContainText(`expected (P50) covers ${decimal(Math.min(expectedLoad.expectedEnergy,4),1)} of 4.0 kWh (${decimal(expectedLoad.expectedShare*100,0)}%)`);
+    for(const invalid of ['0.4','6.1']){await page.locator('#load-duration').fill(invalid);await expect(page.locator('#load-result')).toBeHidden();}
+    for(const duration of ['0.5','6']){await page.locator('#load-duration').fill(duration);await expect(page.locator('#load-result')).toBeVisible();}
+    await page.locator('#load-duration').fill('2');await shot('load');
+    const loadText=await page.locator('#load-result').textContent();
+    await page.locator('#unit').selectOption('MW');await ready();
+    assert.equal(await page.locator('#capacity').inputValue(),'0.005');assert.equal(await page.locator('#ac-limit').inputValue(),'0.00025');
+    const megawatts=JSON.parse(await exported('#json'));assert.equal(megawatts.powerUnit,'MW');assert.equal(megawatts.arrays.length,3);
+    await expect(page.locator('#geometry-note')).toContainText('Site AC limit: 0.00025 MW');
+    assert.ok(megawatts.arrays.every(a=>a.capacity===.005));assert.ok(megawatts.rows.every((r,i)=>Math.abs(r.p50*1000-clipped.rows[i].p50)<1e-12));
+    await expect(page.locator('#load-result')).toHaveText(loadText);await expect(page.locator('#setup-summary')).toHaveText('0.015 MW · 3 arrays · S + E + W · AC limit 0.00025 MW');
+    const mwLink=page.url();await page.goto(mwLink);await ready();assert.equal(await page.locator('#ac-limit').inputValue(),'0.00025');assert.equal(await page.locator('#capacity').inputValue(),'0.005');
+    await page.locator('#unit').selectOption('kW');await ready();assert.equal(await page.locator('#capacity').inputValue(),'5');assert.equal(await page.locator('#ac-limit').inputValue(),'0.25');
+    await shot('arrays');
     const shared=page.url();
     await page.locator('#day-totals button').nth(0).click();await ready();await expect(page.locator('#result-date')).toContainText('Today');await expect(page.locator('#day-totals button').nth(0)).toHaveAttribute('aria-pressed','true');
-    const today=JSON.parse(await exported('#json'));assert.equal(today.modelHorizon,1);assert.ok(today.rows.every(r=>Date.parse(r.time)>=Date.parse('2026-11-05T06:10Z')));await shot('today');
-    await page.locator('#day-totals button').nth(3).click();await ready();await expect(page.locator('#result-date')).toContainText('2026-11-08');assert.ok(JSON.parse(await exported('#json')).bestHours);await shot('three-days');
+    const today=JSON.parse(await exported('#json'));assert.equal(today.modelHorizon,1);assert.equal(today.bestHours.date,today.date);assert.ok(today.bestHours.start>=Date.parse('2026-11-05T06:10Z'));assert.match(await exported('#csv'),/2026-11-05/);await expect(page.locator('#best-heading')).toHaveText('Best solar window · Thu 5 Nov');assert.ok(today.rows.every(r=>Date.parse(r.time)>=Date.parse('2026-11-05T06:10Z')));await shot('today');
+    await page.locator('#day-totals button').nth(3).click();await ready();await expect(page.locator('#result-date')).toContainText('2026-11-08');const thirdDay=JSON.parse(await exported('#json'));assert.equal(thirdDay.bestHours.date,'2026-11-08');await expect(page.locator('#best-heading')).toHaveText('Best solar window · Sun 8 Nov');assert.match(await exported('#csv'),/2026-11-08/);await shot('three-days');
     await page.locator('#save-site').click();await expect(page.locator('#save-status')).toContainText('saved');await expect(page.locator('#save-site')).toHaveText('★ Saved');
     await page.goto(base);await ready();await expect(page.locator('#my-sites')).toBeVisible();await expect(page.locator('#example-label')).toBeHidden();await expect(page.locator('#save-site')).toHaveAttribute('aria-pressed','true');
     assert.equal(await page.locator('#arrays>fieldset').count(),3);assert.equal(await page.locator('#horizon').inputValue(),'3');await expect(page.locator('#site-cards svg')).toBeVisible();await shot('sites','#my-sites');
@@ -163,7 +199,7 @@ try {
     const todayCard=page.locator('#day-totals button').nth(0),tomorrowCard=page.locator('#day-totals button').nth(1);
     await expect(todayCard).toHaveText('TodaySun has set');await expect(todayCard).toHaveAttribute('aria-label','Today · Sun has set');
     await todayCard.click();await ready();await expect(page.locator('#sunset-message')).toContainText('Sun has set');
-    await expect(page.locator('#forecast-chart')).toBeHidden();await expect(page.locator('.totals')).toBeHidden();await shot('sunset');
+    await expect(page.locator('#forecast-chart')).toBeHidden();await expect(page.locator('.totals')).toBeHidden();await expect(page.locator('#best-window')).toBeHidden();assert.equal(JSON.parse(await exported('#json')).bestHours,null);await shot('sunset');
     await tomorrowCard.click();await ready();await expect(page.locator('#forecast-chart')).toBeVisible();await expect(page.locator('#sunset-message')).toBeHidden();
     await page.clock.setFixedTime(new Date('2026-11-05T06:10Z'));await page.locator('#run').click();await ready();
     await expect(todayCard).not.toContainText('Sun has set');
@@ -173,11 +209,56 @@ try {
     // Unroute first: fixture fulfillment must not mask a real offline failure.
     await context.unroute('https://**/*');await context.setOffline(true);
     const offlineResponses=[];page.on('response',r=>{if(r.fromServiceWorker())offlineResponses.push(r.url());});
-    await page.reload();await expect(page.locator('#offline-note')).toContainText('saved at');await expect(page.locator('#forecast-status')).toContainText('offline');
+    await page.reload();await expect(page.locator('#offline-note')).toContainText('Saved forecast for Fri 6 Nov · fetched 07:10');await expect(page.locator('#forecast-status')).toContainText('Saved forecast for Fri 6 Nov');
     assert.equal(await page.locator('#total-mid').innerText(),onlineTotal);assert.ok(offlineResponses.some(u=>u===base||u.startsWith(`${base}#`)));await shot('offline');
+    await page.clock.setFixedTime(new Date('2026-11-06T06:10Z'));await page.reload();
+    await expect(page.locator('#offline-note')).toHaveText('Saved forecast for Fri 6 Nov · fetched 07:10 yesterday');
     assert.deepEqual(errors,[]);await context.close();
     console.log(`PASS ${width}px: phone/desktop DOM and keyboard order, 650/651px breakpoint, latest 8 ledger rows/archive, planned Pro copy, sunset/next-day chart, automatic example, live-only score mean/strip, nav/install, responsive map/tile failure, compact/custom arrays, GTI, AC clip, day segments, best hours/exports, saved star, inline rename/delete, MRU reopen, shares, SW offline, layout/touch targets`);
   }
+  // Slow/failed background days must never hold the selected day's controls or exports.
+  const loading=await browser.newContext({viewport:{width:375,height:1000},serviceWorkers:'block',timezoneId:'Europe/Brussels'});
+  let release;const held=new Promise(resolve=>{release=resolve;}),calls={weather:0,gti:0};
+  await loading.route('https://**/*',async route=>{
+    const url=new URL(route.request().url());
+    if(url.hostname==='previous-runs-api.open-meteo.com'){
+      calls.weather++;
+      const h=Number(url.searchParams.get('hourly').match(/previous_day(\d)/)[1])-1;
+      if(h===2)return route.fulfill({status:503,json:{error:true,reason:'Fixture background day failed'}});
+      if(h===3)await held;
+      return route.fulfill({json:weather[h-1].open_meteo});
+    }
+    if(url.hostname==='api.open-meteo.com'){calls.gti++;return route.fulfill({json:gti[Number(url.searchParams.get('azimuth'))<0?'gti-east':'gti']});}
+    return route.abort();
+  });
+  const loadingPage=await loading.newPage(),loadingErrors=[];loadingPage.on('pageerror',e=>loadingErrors.push(e.message));
+  await loadingPage.clock.setFixedTime(new Date('2026-11-05T06:10Z'));
+  await loadingPage.goto(base+'#lat=50.85&lon=4.37&capacity=5&tilt=40&azimuth=90&unit=kW&risk=90&tz=Europe%2FBrussels&horizon=1');
+  await expect(loadingPage.locator('#forecast-status')).toHaveText('Weather fetched 07:10 · model calibrated through 8 Nov',{timeout:60000});
+  await expect(loadingPage.locator('#run')).toBeEnabled();await expect(loadingPage.locator('#refresh')).toBeEnabled();
+  await expect(loadingPage.locator('#day-totals button').nth(3)).toContainText('Loading');
+  await expect(loadingPage.locator('#day-totals button').nth(2)).toContainText('Unavailable');
+  await expect(loadingPage.locator('#best-heading')).toHaveText('Best solar window · Fri 6 Nov');
+  await expect(loadingPage.locator('#json')).toBeEnabled();await expect(loadingPage.locator('#csv')).toBeEnabled();
+  const [whileLoading]=await Promise.all([loadingPage.waitForEvent('download'),loadingPage.locator('#json').click()]);
+  await whileLoading.saveAs(join(temp,'loading.json'));assert.equal((await read(join(temp,'loading.json'))).bestHours.date,'2026-11-06');
+  release();await expect(loadingPage.locator('#day-totals')).not.toContainText('Loading');
+  const count={...calls};
+  await loadingPage.clock.setFixedTime(new Date('2026-11-05T06:39:59Z'));await loadingPage.locator('#run').click();
+  await expect(loadingPage.locator('#run')).toBeEnabled();await expect(loadingPage.locator('#day-totals')).not.toContainText('Loading');
+  assert.equal(calls.weather,count.weather+1,'Only failed D+2 retries before expiry');assert.equal(calls.gti,count.gti);
+  await expect(loadingPage.locator('#forecast-status')).toContainText('Weather fetched 07:10');
+  const expired={...calls};await loadingPage.clock.setFixedTime(new Date('2026-11-05T06:40Z'));await loadingPage.locator('#run').click();
+  await expect(loadingPage.locator('#forecast-status')).toContainText('Weather fetched 07:40');await expect(loadingPage.locator('#run')).toBeEnabled();
+  await expect(loadingPage.locator('#day-totals')).not.toContainText('Loading');
+  assert.ok(calls.weather>=expired.weather+3);assert.equal(calls.gti,expired.gti+2);
+  const forced={...calls};await loadingPage.clock.setFixedTime(new Date('2026-11-05T06:41Z'));await loadingPage.locator('#refresh').click();
+  await expect(loadingPage.locator('#forecast-status')).toContainText('Weather fetched 07:41');await expect(loadingPage.locator('#day-totals')).not.toContainText('Loading');
+  assert.ok(calls.weather>=forced.weather+3);assert.equal(calls.gti,forced.gti+2);
+  // Selecting Today immediately changes the window's target date.
+  await loadingPage.locator('#day-totals button').nth(0).click();await expect(loadingPage.locator('#best-heading')).toHaveText('Best solar window · Thu 5 Nov');
+  await expect(loadingPage.locator('#run')).toBeEnabled();assert.deepEqual(loadingErrors,[]);await loading.close();
+  console.log('PASS v4 loading isolation, background failure, selected-day exports, 30-minute weather/GTI expiry and forced Refresh');
   // Real solar geometry at 89°N: all fixture dates are polar night, despite populated weather.
   const polar=await browser.newContext({viewport:{width:375,height:1000},serviceWorkers:'block'});
   await polar.route('https://**/*',route=>{
@@ -190,7 +271,7 @@ try {
   await polarPage.clock.setFixedTime(new Date('2026-11-05T12:00Z'));
   await polarPage.goto(base+'#lat=89&lon=4.37&capacity=5&unit=kW&risk=90&tz=Europe%2FBrussels&horizon=1');
   await expect(polarPage.locator('#run')).toBeEnabled({timeout:60000});
-  await expect(polarPage.locator('#forecast-status')).toHaveText(/^Ready/);
+  await expect(polarPage.locator('#forecast-status')).toHaveText(/^Weather fetched /);
   await expect(polarPage.locator('#day-totals button span')).toHaveText(Array(4).fill('Sun has set'));
   for(const h of [0,1]){
     await polarPage.locator('#day-totals button').nth(h).click();
@@ -206,7 +287,7 @@ try {
   await blocked.route('https://previous-runs-api.open-meteo.com/**',r=>r.fulfill({json:weather[0].open_meteo}));
   const p=await blocked.newPage();await p.clock.setFixedTime(new Date('2026-11-05T06:10Z'));
   await p.goto(base+'#lat=50.85&lon=4.37&capacity=5&unit=kW&risk=90&tz=Europe%2FBrussels&horizon=1');
-  await expect(p.locator('#forecast-status')).toHaveText(/^Ready/,{timeout:60000});await p.locator('#save-site').click();await expect(p.locator('#save-status')).toContainText('Storage unavailable');
+  await expect(p.locator('#forecast-status')).toHaveText(/^Weather fetched /,{timeout:60000});await p.locator('#save-site').click();await expect(p.locator('#save-status')).toContainText('Storage unavailable');
   assert.equal(await p.locator('#arrays>fieldset').count(),1);await blocked.close();
   console.log(`PASS old shares + blocked localStorage. Screenshots: ${shots}`);
 } finally {

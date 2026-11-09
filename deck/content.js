@@ -52,11 +52,11 @@ s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Overview" });
 s.addText("Solar has to be promised a day before it shines", { placeholder: "title" });
 text(s, [
   { text: "A single number hides the decision", options: { bold: true, breakLine: true } },
-  { text: "Traders, plant owners and grid operators commit power at 11:00 the day before. They need to know how much they can safely promise.", options: { breakLine: true } },
-  { text: "A wide range costs money", options: { bold: true, breakLine: true } },
-  { text: "Every megawatt of uncertainty has to be covered by reserves or left unsold.", options: { breakLine: true } },
-  { text: "Accuracy claims are hard to check", options: { bold: true, breakLine: true } },
-  { text: "We found no forecast vendor that publishes a daily record next to the grid operator's own forecast." },
+  { text: "Elia publishes its day-ahead solar forecast, with a P10–P90 range, at 11:00 the day before. The market plans on it.", options: { breakLine: true } },
+  { text: "A wide range is hard to plan on", options: { bold: true, breakLine: true } },
+  { text: "The narrower the range at the same coverage, the more solar can be scheduled with confidence.", options: { breakLine: true } },
+  { text: "Accuracy should be checkable", options: { bold: true, breakLine: true } },
+  { text: "Penumbra publishes its forecast next to Elia's every day and scores both the next morning." },
 ], { x: 0.6, y: 1.8, w: 6.4, h: 4.8, fontSize: 18, paraSpaceAfter: 10, objectName: "Problem points" });
 stat(s, 7.6, 1.8, 5.13, "12.6 GW", "solar monitored by Elia in Belgium, November 2026", "Capacity stat");
 stat(s, 7.6, 4.1, 5.13, "1,561 MW", "average width of Elia's 80% band over the 359 test days", "Band stat");
@@ -83,7 +83,7 @@ s.addNotes("We do not re-forecast the weather. We use what the operator already 
 // 4
 s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Solution" });
 s.addText("Every v2 input existed at the 11:00 cutoff", { placeholder: "title" });
-const flow = [["History from 2021", "Training start", "Public data only"], ["2025-05 to 2025-10", "Validation", "v2 choices made here"], ["Commit 6e8d5b8", "Freeze", "Pipeline committed before the test"], ["2025-11 to 2026-10", "v2 test, one run", "359 days, chosen on validation"], ["From 2026-11-04", "Live ledger", "Issued before the outcome"]];
+const flow = [["History from 2021", "Training start", "Public data only"], ["2025-05 to 2025-10", "Validation", "v2 choices made here"], ["Commit 6e8d5b8", "Freeze", "Pipeline committed before the test"], ["2025-11 to 2026-10", "v2 test, run once", "359 days; v1 and v2 each ran once"], ["From 2026-11-04", "Live ledger", "Issued before the outcome"]];
 s.addShape(pres.ShapeType.line, { x: 1.0, y: 2.25, w: 11.3, h: 0, line: { color: C.accent2, width: 2 }, objectName: "Timeline" });
 flow.forEach(([d, h, b], i) => {
   const x = 0.6 + i * 2.45;
@@ -149,7 +149,7 @@ stat(s, 4.74, 1.8, 3.85, "+203 MW", "higher average P10: 2,054 MW vs 1,851 MW", 
 stat(s, 8.88, 1.8, 3.85, "10.5%", "provincial band width vs 13.2%; coverage rises from 75.4% to 80.2%", "Province impact");
 text(s, [
   { text: "Who uses this", options: { bold: true, breakLine: true, color: C.accent1, fontSize: 20 } },
-  { text: "Grid operators: size reserves on a band that matches reality", options: { bullet: { indent: 14 }, breakLine: true } },
+  { text: "Grid operators: a band that is narrower at the same coverage", options: { bullet: { indent: 14 }, breakLine: true } },
   { text: "Market parties: choose how much to sell, by the risk they accept", options: { bullet: { indent: 14 }, breakLine: true } },
   { text: "Plant and home owners: plan batteries and loads for tomorrow", options: { bullet: { indent: 14 }, breakLine: true } },
 ], { x: 0.6, y: 4.1, w: 7.6, h: 2.5, fontSize: 16, paraSpaceAfter: 6, objectName: "Users" });
@@ -175,15 +175,15 @@ s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Product" });
 s.addText("A working forecast in under 15 seconds, with no sign-up", { placeholder: "title" });
 s.addImage({ path: "deck/img/tool_panel.png", x: 0.6, y: 1.7, w: 7.6, h: 4.67, altText: "Penumbra forecast tool showing Cambridge with a P10 to P90 band", objectName: "Tool screenshot" });
 text(s, [
-  { text: "Any place: search, GPS or coordinates", options: { bullet: { indent: 14 }, breakLine: true } },
+  { text: "Any place: map, search, GPS or coordinates; up to three panel arrays", options: { bullet: { indent: 14 }, breakLine: true } },
   { text: "Model runs in the browser; coordinates go only to the weather API", options: { bullet: { indent: 14 }, breakLine: true } },
-  { text: "Risk slider turns the band into a commitment", options: { bullet: { indent: 14 }, breakLine: true } },
+  { text: "Margin slider turns the band into a conservative plan; best solar window per day", options: { bullet: { indent: 14 }, breakLine: true } },
   { text: "CSV and JSON export, shareable links", options: { bullet: { indent: 14 }, breakLine: true } },
-  { text: "Works at phone width", options: { bullet: { indent: 14 }, breakLine: true } },
+  { text: "Installs on a phone; today to three days ahead", options: { bullet: { indent: 14 }, breakLine: true } },
   { text: "Browser results match Python to 0.0001 on real weather, tested on every change", options: { bullet: { indent: 14 } } },
 ], { x: 8.6, y: 1.8, w: 4.13, h: 4.2, fontSize: 16, paraSpaceAfter: 8, objectName: "Product features" });
 text(s, SITE, { x: 8.6, y: 6.05, w: 4.13, h: 0.35, fontSize: 14, bold: true, color: C.accent1, objectName: "Link" });
-s.addNotes("Open the site, search for a place, move the slider. Optional tilt and compass inputs apply a clear-sky geometric adjustment. Default 35 degrees south preserves the fleet forecast.");
+s.addNotes("Open the site, search for a place, move the slider. Each array is scaled by Open-Meteo forecast irradiance on its tilted plane. One array at 35 degrees south reproduces the fleet forecast exactly.");
 
 // 10
 s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Product" });
@@ -191,11 +191,11 @@ s.addText("Every forecast goes on a public ledger, next to Elia's", { placeholde
 s.addImage({ path: "deck/img/ledger_chart.png", x: 0.6, y: 1.7, w: 7.6, h: 3.27, altText: "Ledger chart comparing Penumbra and Elia for Belgium on 3 November 2026", objectName: "Ledger screenshot" });
 text(s, "Each morning after Elia's 11:00 forecast, Penumbra issues tomorrow's forecast. The next day it is scored automatically.", { x: 0.6, y: 5.2, w: 7.6, h: 1.3, fontSize: 16, objectName: "Ledger caption" });
 text(s, [
-  { text: "Never edited: ", options: { bold: true } }, { text: "each file holds the hash of the one before, and your browser checks the chain", options: { breakLine: true } },
+  { text: "Hash-chained: ", options: { bold: true } }, { text: "each file holds the hash of the one before, and your browser checks the chain", options: { breakLine: true } },
   { text: "Time-stamped: ", options: { bold: true } }, { text: "public Git history dates every entry", options: { breakLine: true } },
   { text: "Honest labels: ", options: { bold: true } }, { text: "live days and backfilled days are scored apart and never added together" },
 ], { x: 8.6, y: 1.8, w: 4.13, h: 4.6, fontSize: 16, paraSpaceAfter: 14, objectName: "Ledger points" });
-s.addNotes("Live forecasts start on 4 November 2026. Elia published no 11:00 forecast for 28 October, after moving to new datasets, so that date has no entry.");
+s.addNotes("Live forecasts start on 4 November 2026. 28 October is a labelled backfill, scored apart from live days.");
 
 // 11
 s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Product" });
@@ -209,8 +209,8 @@ s.addTable([
   row("P10, P50, P90 range", "Yes", "Not listed", "Not listed", "No", "Yes"),
   row("Measured coverage published", "Not listed", "Not listed", "Not listed", "No", "Yes"),
   row("Daily record against the grid operator", "Not listed", "No", "Not listed", "No", "Yes"),
-  row("Risk-based commitment", "Not listed", "No", "Not listed", "No", "Yes"),
-  row("Tilt and orientation", "Yes", "Yes", "Yes", "Yes", "Geometric"),
+  row("Margin-based daily plan", "Not listed", "No", "Not listed", "No", "Yes"),
+  row("Tilt and orientation", "Yes", "Yes", "Yes", "Yes", "Yes"),
 ], { x: 0.6, y: 1.8, w: 12.13, colW: [4.13, 1.6, 1.6, 1.6, 1.6, 1.6], rowH: 0.62, fontSize: 14, color: C.text1, border: { type: "solid", pt: 0.5, color: HEX.accent5 }, valign: "middle", objectName: "Competitor table" });
 text(s, "Based on each product's public pages and documentation, November 2026. \"Not listed\" means we did not find it there.", { x: 0.6, y: 6.2, w: 12.1, h: 0.5, fontSize: 12, color: C.accent4, objectName: "Table note" });
 s.addNotes("Solcast is the international commercial standard, Forecast.Solar is common among home users and developers, Sprixin is the listed Chinese market leader, Quartz is the open-source baseline.");

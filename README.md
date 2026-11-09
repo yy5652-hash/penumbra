@@ -1,10 +1,11 @@
 # Penumbra
 
-**Solar, with a margin.** Penumbra tells you how much solar power you can count on. Drop a pin, describe your roof, and get a calibrated P10–P90 range for today and the next three days, the hours you can rely on most, and how much you can safely commit at the risk you choose. Free, no account, installable on a phone, and the model runs on your device.
+**Solar, with a margin.** Penumbra is two things built on one idea, learning the forecast error. **A grid model** forecasts Belgium's solar fleet every day beside Elia, the grid operator, and is scored in public. **A planning tool** brings the same calibrated P10–P90 approach to any place and panel setup: drop a pin, describe your panels, and get a low, expected and high range for today and the next three days, the best solar window, and a conservative plan at the margin you choose. Free, no account, installable on a phone, and the model runs on your device.
 
-For Belgium, Penumbra forecasts the national fleet every day next to Elia, the grid operator, and scores both in a public, hash-chained ledger. On 359 unseen days it cut pinball loss by **10.8%** against Elia's own probabilistic forecast, with a band almost a third narrower (**9.1% vs 13.3%** of capacity) while still covering **80%** of outcomes.
+The grid model is where the headline comes from. Penumbra publishes its national forecast every day next to Elia's and scores both in a public, hash-chained ledger. On 359 held-out test days (November 2025 to October 2026, day-ahead) it cut pinball loss by **10.8%** against Elia's own probabilistic forecast, with a band almost a third narrower (**9.1% vs 13.3%** of capacity) while still covering **80%** of outcomes.
 
 **Live site:** https://yy5652-hash.github.io/penumbra/
+**Check the headline in seconds:** `evidence/` holds every scored test quarter-hour for Penumbra and Elia; `python src/verify_headline.py` recomputes the results table and confidence intervals without retraining and prints PASS.
 **Presentation:** https://yy5652-hash.github.io/penumbra/deck.html · [PowerPoint download](https://yy5652-hash.github.io/penumbra/Penumbra_DATANOVA_2026.pptx)
 Built for DATANOVA 2026, track DN-SU-01 Solar Energy Generation Forecasting.
 
@@ -12,8 +13,8 @@ Built for DATANOVA 2026, track DN-SU-01 Solar Energy Generation Forecasting.
 
 1. **Pick a place**: map, search, GPS or an example. A forecast appears straight away for a default 5 kW, 35° south roof.
 2. **Describe your roof**: up to three arrays (for example east and west), each with capacity, tilt and direction, plus an optional inverter limit. Orientation uses Open-Meteo's forecast irradiance on the tilted plane.
-3. **Read the range**: Today, Tomorrow, In 2 days, In 3 days; P10, P50 and P90 energy; a 15-minute chart; the most reliable hours to run the washing machine or charge the car.
-4. **Commit**: the risk slider turns the band into a number you can promise.
+3. **Read the range**: Today, Tomorrow, In 2 days, In 3 days; P10, P50 and P90 energy; a 15-minute chart; the best solar window for the selected day, and an optional check of how much of a planned load the low case covers.
+4. **Plan**: the margin slider turns the band into a conservative plan for the day.
 5. **Keep it**: save sites on this device, share a link, export CSV or JSON, install the app; the last forecast stays readable offline.
 
 ## Results
@@ -90,7 +91,7 @@ For a reboot-safe round-3 run, use `.venv/bin/python tools/resume-round3.py`. Co
 
 Run `.venv/bin/python tools/resume-round3.py --orientation-only` for the plant-geometry browser checks. They use recorded weather fixtures and cover defaults, adjustments, exports, share restoration, input limits and phone layout. `--browser-only` includes these checks after the horizon, deck and gallery stages.
 
-On macOS without Homebrew libomp, prefix the LightGBM commands with `DYLD_LIBRARY_PATH=$PWD/.venv/lib/python3.11/site-packages/sklearn/.dylibs`. Quartz runs in its own environment: see `src/quartz_baseline.py` for the pinned versions noted in `PROGRESS.md`.
+On macOS without Homebrew libomp, prefix the LightGBM commands with `DYLD_LIBRARY_PATH=$PWD/.venv/lib/python3.11/site-packages/sklearn/.dylibs`. Quartz runs in its own environment: it pins quartz_solar_forecast 1.2.12, numpy 1.26.4, scipy 1.17.1 and pyarrow 17.0.0 (see `src/quartz_baseline.py`).
 
 ## Sources and credits
 

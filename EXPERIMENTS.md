@@ -1,7 +1,8 @@
 # Experiments
 
 All scores are on daylight quarter-hours, as a share of monitored capacity. Weather is at least 48 h old at the
-11:00 D-1 cutoff. Only the pipeline frozen in commit 2d11d22 ran on the test window, and it ran once.
+11:00 D-1 cutoff. v1 was frozen in 2d11d22 and run once on the test window. v2 was chosen on validation,
+frozen in 6e8d5b8, then run once on the same test window.
 
 ## Validation, 2025-05..2025-10 (184 days)
 | Change | Scope | Pinball | MAE | Cover 80 | Width | Verdict |

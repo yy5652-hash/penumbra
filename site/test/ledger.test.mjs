@@ -9,6 +9,15 @@ const files=await Promise.all(days.map(async date=>({date,text:await read(`../le
 test('Published ledger chain verifies original file bytes',async()=>{
   const result=await verifyChain(files); assert.equal(result.ok,true); assert.equal(result.count,files.length);
 });
+test('Reject unknown links and descending issue times, accept links to earlier files',async()=>{
+  const doc=(date,issued_at,prev_sha256)=>({date,text:JSON.stringify({target_date:date,issued_at,prev_sha256})});
+  const hash=f=>createHash('sha256').update(f.text).digest('hex');
+  const first=doc('2026-01-01','2026-01-01T10:00Z',null),second=doc('2026-01-02','2026-01-01T10:00Z',hash(first));
+  assert.equal((await verifyChain([first,second,doc('2026-01-03','2026-01-01T10:00Z',hash(second))])).ok,true);
+  assert.equal((await verifyChain([first,second,doc('2026-01-03','2026-01-01T10:00Z',hash(first))])).ok,true);
+  assert.match((await verifyChain([first,second,doc('2026-01-03','2026-01-01T10:00Z','00'.repeat(32))])).reason,/no earlier/);
+  assert.match((await verifyChain([first,second,doc('2026-01-03','2026-01-01T09:00Z',hash(second))])).reason,/issue order/);
+});
 test('Changed file is rejected at the first broken link',async()=>{
   const changed=structuredClone(files); changed[0].text+=' ';
   const result=await verifyChain(changed); assert.equal(result.ok,false); assert.equal(result.brokenDate,files[1].date);

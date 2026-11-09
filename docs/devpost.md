@@ -2,17 +2,17 @@
 
 **Project name:** Penumbra
 
-**Elevator pitch:** Solar forecasts with an honest margin: calibrated P10–P90 for any roof, up to three days ahead, 10.8% better than the grid operator's own.
+**Elevator pitch:** Calibrated solar ranges for your panels, three days ahead, from a grid model with 10.8% lower pinball loss than Belgium's grid operator over a year of held-out days.
 
 **Track:** DN-SU-01 Solar Energy Generation Forecasting
 
 ## Overview
-Penumbra tells you how much solar power you can count on. Drop a pin, describe your roof, and get a calibrated P10–P90 range for today and the next three days, the hours you can rely on most, and how much you can safely commit at the risk you choose. It is free, needs no account, installs on a phone, and runs its model on your device.
+Penumbra is two things built on one idea, learning the forecast error. **A grid model** forecasts Belgium's solar fleet every day beside Elia, the grid operator, and is scored in public. **A planning tool** brings the same calibrated P10–P90 approach to any place and panel setup: drop a pin, describe your panels, and get a low, expected and high range for today and the next three days, the best solar window, and a conservative plan at the margin you choose. It is free, needs no account, installs on a phone, and runs its model on your device.
 
-For Belgium, Penumbra forecasts the national fleet every day next to Elia, the grid operator, and scores both the next morning in a public, hash-chained ledger. On 359 unseen days it cut pinball loss by 10.8% against Elia's own probabilistic forecast, with a band almost a third narrower (9.1% vs 13.3% of capacity) while still covering 80% of outcomes.
+The grid model is where the headline comes from. Penumbra publishes its national forecast every day next to Elia's and scores both the next morning in a public, hash-chained ledger. On 359 held-out test days (November 2025 to October 2026, day-ahead) it cut pinball loss by 10.8% against Elia's own probabilistic forecast, with a band almost a third narrower (9.1% vs 13.3% of capacity) while still covering 80% of outcomes.
 
 ## Problem
-Grid operators, traders and plant owners commit solar power at 11:00 the day before. They need to know how much they can safely promise, so a single number is not enough. A wide range costs money, because uncertainty has to be covered by reserves or left unsold. Accuracy claims are also hard to check: we found no vendor that publishes a daily record next to the grid operator's own forecast.
+Elia publishes its day-ahead solar forecast with a P10–P90 range at 11:00 the day before, and the market plans around it. A single number is not enough to plan on, and a range that is wider than it needs to be makes solar harder to schedule. Accuracy claims are also easier to trust when they can be checked: Penumbra publishes its forecast next to Elia's every day and scores both the next morning.
 
 ## Solution
 Penumbra does not re-forecast the weather. It learns where the official forecast goes wrong. A LightGBM model learns the P10, P50 and P90 of the gap to Elia's median, using four weather models, fresh GFS, solar geometry, D-1 morning output and recent Elia error. A rolling conformal step then corrects the band using the last 60 days. A second model uses weather alone, needs no local history, and runs in the visitor's browser for any place.
@@ -25,6 +25,7 @@ Python, pandas, LightGBM, rolling conformal quantile calibration. A static site 
 - Presentation: https://yy5652-hash.github.io/penumbra/deck.html · [PowerPoint download](https://yy5652-hash.github.io/penumbra/Penumbra_DATANOVA_2026.pptx)
 - Code: https://github.com/yy5652-hash/penumbra
 - Forecast tool: pick a place on a map, by search or GPS; up to three roof arrays with capacity, tilt, direction and an optional inverter limit, using forecast irradiance on each tilted plane; Today to In 3 days; P10/P50/P90 energy and a 15-minute chart; the most reliable hours of the day; a risk slider that turns the band into a commitment; saved sites, share links, CSV and JSON export; installable on a phone, with the last forecast available offline.
+- Check the headline in seconds: the `evidence/` folder in the repository holds every scored test quarter-hour for Penumbra and Elia, and `python src/verify_headline.py` recomputes the results table and confidence intervals without retraining.
 - Public ledger: one forecast per day, each carrying the hash of the one before, checked in the browser. Live forecasts begin with 4 November 2026.
 - Parity tests confirm that the browser matches Python to 0.0001 on real weather responses.
 

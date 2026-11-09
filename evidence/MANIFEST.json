@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "description": "Frozen test v2 common-row scoring evidence; no retraining or new test run.",
+  "source_commit": "6e8d5b84298449a51da1c141edf8f9f6c1c13c01",
+  "source_commit_role": "v2 specification frozen after validation, before its single test run",
+  "v1_source_commit": "2d11d22197c8d7448b70e2c488a6c8fa0a4aa7c0",
+  "history": "v1 frozen and run once; v2 selected on validation, frozen, and run once on the same test window.",
+  "test_window": {
+    "start": "2025-11-01",
+    "end": "2026-10-31",
+    "timezone": "UTC",
+    "calendar_days": 365,
+    "first_scored_timestamp_utc": "2025-11-01T06:45:00Z",
+    "last_scored_timestamp_utc": "2026-10-25T16:30:00Z",
+    "days_scored": 359,
+    "excluded_dates": [
+      {
+        "date": "2026-10-26",
+        "reason": "No rows in the frozen ods032 source archive (last timestamp 2026-10-25T22:45:00Z); the frozen v2 input table did not append the replacement ods209/ods210 datasets. No evaluation rows were removed because of their loss."
+      },
+      {
+        "date": "2026-10-27",
+        "reason": "No rows in the frozen ods032 source archive (last timestamp 2026-10-25T22:45:00Z); the frozen v2 input table did not append the replacement ods209/ods210 datasets. No evaluation rows were removed because of their loss."
+      },
+      {
+        "date": "2026-10-28",
+        "reason": "No rows in the frozen ods032 source archive (last timestamp 2026-10-25T22:45:00Z); the frozen v2 input table did not append the replacement ods209/ods210 datasets. No evaluation rows were removed because of their loss."
+      },
+      {
+        "date": "2026-10-29",
+        "reason": "No rows in the frozen ods032 source archive (last timestamp 2026-10-25T22:45:00Z); the frozen v2 input table did not append the replacement ods209/ods210 datasets. No evaluation rows were removed because of their loss."
+      },
+      {
+        "date": "2026-10-30",
+        "reason": "No rows in the frozen ods032 source archive (last timestamp 2026-10-25T22:45:00Z); the frozen v2 input table did not append the replacement ods209/ods210 datasets. No evaluation rows were removed because of their loss."
+      },
+      {
+        "date": "2026-10-31",
+        "reason": "No rows in the frozen ods032 source archive (last timestamp 2026-10-25T22:45:00Z); the frozen v2 input table did not append the replacement ods209/ods210 datasets. No evaluation rows were removed because of their loss."
+      }
+    ],
+    "why_359_days": "365 calendar days minus the six dates absent from the frozen input archive."
+  },
+  "rows_scored": 205209,
+  "daily_rows": 4308,
+  "scopes": {
+    "Antwerp": 17097,
+    "Belgium": 17022,
+    "Brussels": 17107,
+    "East-Flanders": 17124,
+    "Flemish-Brabant": 17106,
+    "Hainaut": 17127,
+    "Limburg": 17094,
+    "Li\u00e8ge": 17088,
+    "Luxembourg": 17092,
+    "Namur": 17107,
+    "Walloon-Brabant": 17112,
+    "West-Flanders": 17133
+  },
+  "scoring": {
+    "source": [
+      "src/features.py:build",
+      "src/backtest.py:main_v2",
+      "src/backtest.py:score",
+      "src/backtest.py:daily_block_ci",
+      "src/run_test_v2.py"
+    ],
+    "cohort": "Extended feature table: elevation > 0, k_mean or k_gfs non-null, actual/capacity in [0,1]; main_v2 drops rows missing any Elia P10/P50/P90 and restricts the test window. All exported calibrated Penumbra and Elia quantiles are non-null, so report() scores identical rows.",
+    "units": "Capacity, actual and all forecasts are MW; elevation_deg is degrees; losses and widths are capacity shares.",
+    "normalisation": "Divide actual and each forecast by the monitoredcapacity for that timestamp and scope from ods032.",
+    "pinball": "Equal mean of max(q*(actual-forecast), (q-1)*(actual-forecast)) for q=0.1,0.5,0.9, then mean across rows.",
+    "mae": "Mean absolute error of P50, after per-row capacity normalisation.",
+    "coverage": "Inclusive actual >= P10 and actual <= P90; preserve calibrated bounds without sorting/clipping.",
+    "width": "Mean of (P90-P10)/capacity; preserve signed calibrated widths as scored.",
+    "provinces": "Pool all 11 provincial scopes with equal weight per row; no averaging of provincial means or MW weighting.",
+    "daily_file": "One row per UTC date and individual scope, sums and means in capacity shares. Provinces daily means pool sums/counts across provincial scopes.",
+    "ci": {
+      "method": "Paired daily pinball differences (Penumbra minus Elia), equally weighted UTC-day means sampled with replacement.",
+      "draws": 2000,
+      "seed": 11,
+      "rng": "numpy.random.default_rng (PCG64), reset separately for each scope",
+      "indices": "rng.integers(0, days, (2000, days))",
+      "quantiles": [
+        0.025,
+        0.975
+      ],
+      "quantile_method": "linear"
+    },
+    "published_precision": {
+      "pinball_decimals": 4,
+      "mae_percent_decimals": 2,
+      "coverage_percent_decimals": 1,
+      "width_percent_decimals": 1,
+      "pinball_change_percent_decimals": 1,
+      "ci_decimals": 5,
+      "all_original_scorer_metrics_decimals": 4
+    }
+  },
+  "rounding": {
+    "mw_decimal_places": 6,
+    "elevation_decimal_places": 6,
+    "daily_significant_digits": 15,
+    "max_absolute_normalised_error_vs_original": 1.5822867183157285e-09,
+    "coverage_below_above_changed_rows": 0,
+    "validation": "Every reference metric, CI and relative change matches at published precision; all binary coverage/below/above flags match row by row."
+  },
+  "environment_checked": {
+    "python": "3.11.17",
+    "pandas": "3.1.0",
+    "numpy": "2.4.6",
+    "pandas_docs": "https://github.com/pandas-dev/pandas/blob/main/doc/source/whatsnew/v3.1.0.rst",
+    "numpy_docs": "https://numpy.org/doc/2.4/reference/random/generator.html"
+  },
+  "data_licences": [
+    {
+      "data": "Elia actual observations, monitored capacities and day-ahead P10/P50/P90",
+      "licence": "Creative Commons Attribution 4.0 International",
+      "spdx": "CC-BY-4.0",
+      "attribution": "Elia Transmission Belgium SA",
+      "source_dataset": "https://opendata.elia.be/explore/dataset/ods032/",
+      "source_licence": "https://opendata.elia.be/pages/licence/",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "changes": "Selected common daylight intervals, added Penumbra model predictions, converted predictions to MW, rounded fields, and aggregated daily losses."
+    }
+  ],
+  "model_outputs": "Penumbra calibrated P10/P50/P90 outputs; no model training or meteorological source files are redistributed in this pack.",
+  "input_files_read_only": {
+    "data/results/test_v2_grid.parquet": {
+      "bytes": 23472451,
+      "sha256": "93d4876df7cb4e1a7e52ee50914b99cb37c5a7b5cad1751903e44e473839bb80"
+    },
+    "data/results/test_v2_scores.csv": {
+      "bytes": 730,
+      "sha256": "a8ca859c91173670b99dcbef90a369df3f162477b9ec2c178ecad641c052662b"
+    },
+    "data/results/test_v2_ci.json": {
+      "bytes": 263,
+      "sha256": "64027bcdebc9cdd14f952af2cbef4d726104f2fd660687a9e576d0fd68ff2ca2"
+    },
+    "data/results/test_v2_value.json": {
+      "bytes": 302,
+      "sha256": "fb76be0750e9a57a476f0a3352e6dd2f8537dd61d27fbbf0d371dd7b1f81fc3a"
+    },
+    "data/raw/elia_ods032.parquet": {
+      "bytes": 32212890,
+      "sha256": "6686db1fbc5357a5f7282a100878927c046db433883e5c4ff0ff54c6865540f9"
+    }
+  },
+  "capacity_provenance": "Exact timestamp/region one-to-one join to archived ods032; actual and all Elia normalised quantiles match the frozen grid bit-for-bit before rounding.",
+  "hash_scope": "SHA-256 and byte lengths of every other evidence file; MANIFEST.json is excluded to avoid a self-referential hash.",
+  "files": {
+    "README.md": {
+      "bytes": 3003,
+      "sha256": "8b17a9ee8c0b43cf72509364ead194723bcd1041aa61e894ec2681d46c8bc6f6"
+    },
+    "test_v2_ci.json": {
+      "bytes": 263,
+      "sha256": "64027bcdebc9cdd14f952af2cbef4d726104f2fd660687a9e576d0fd68ff2ca2"
+    },
+    "test_v2_daily.csv": {
+      "bytes": 597585,
+      "sha256": "5098943b3fef179d5eabf6a3672e40cfed2c08438d29bd8ad74fe3043812d93c"
+    },
+    "test_v2_intervals.csv.gz": {
+      "bytes": 8537584,
+      "sha256": "686c0052a7c83e5f7fe5d1607ade53c16b54dd99c220220bf44f1dca286344f3"
+    },
+    "test_v2_scores.csv": {
+      "bytes": 730,
+      "sha256": "a8ca859c91173670b99dcbef90a369df3f162477b9ec2c178ecad641c052662b"
+    }
+  }
+}

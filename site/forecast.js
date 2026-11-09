@@ -136,19 +136,22 @@ export function quantileAt(p10,p50,p90,q) {
 }
 /** Hash the original UTF-8 bytes, never a re-serialized JSON object. */
 export async function verifyChain(files) {
-  // Files come in issue order. The first has no predecessor; every later file must point at a file issued before it,
-  // so changing, removing or reordering any file breaks a link.
-  const seen=new Set(); let previous=null;
+  // Files come in issue order (index order breaks ties at identical issue times). The first has no predecessor; every
+  // later file must carry the exact hash of a file issued before it, so changing, removing or reordering a file breaks a link.
+  const seen=new Map(); let previous=null,previousIssue=-Infinity;
   for (let i=0; i<files.length; i++) {
     const {date,text}=files[i];
     try {
       const doc=JSON.parse(text);
+      const issue=doc.issued_at==null?previousIssue:Date.parse(doc.issued_at);
+      if(!Number.isFinite(issue)&&doc.issued_at!=null||issue<previousIssue)return {ok:false,count:i,brokenDate:date,reason:'Documents are not in issue order.'};
+      if(doc.target_date!==date)return {ok:false,count:i,brokenDate:date,reason:'Target date does not match the indexed file.'};
       const linked=i===0 ? doc.prev_sha256===null : seen.has(doc.prev_sha256);
-      if (doc.target_date!==date || !linked) return {ok:false,count:i,brokenDate:date};
+      if(!linked)return {ok:false,count:i,brokenDate:date,actualHash:doc.prev_sha256,reason:i===0?'First document must have a null predecessor.':'Stored predecessor hash matches no earlier document.'};
       const digest=await globalThis.crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));
       previous=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
-      seen.add(previous);
-    } catch { return {ok:false,count:i,brokenDate:date}; }
+      seen.set(previous,date);previousIssue=issue;
+    } catch { return {ok:false,count:i,brokenDate:date,reason:'Invalid ledger document.'}; }
   }
   return {ok:true,count:files.length,head:previous};
 }

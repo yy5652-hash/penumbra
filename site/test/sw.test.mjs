@@ -30,7 +30,7 @@ function worker() {
 test('Service worker precaches relative shell/model, claims scope and preserves saved forecast cache',async()=>{
   const w=worker();await w.caches.open('penumbra-shell-old');await w.caches.open('penumbra-saved-v3');await w.send('install');await w.send('activate');
   assert.equal(w.state.claimed,true);assert.equal(w.stores.has('penumbra-shell-old'),false);assert.equal(w.stores.has('penumbra-saved-v3'),true);
-  const keys=[...w.stores.get('penumbra-shell-v3-1').keys()];assert.ok(keys.every(k=>k.startsWith('http://localhost/penumbra/')));assert.ok(keys.includes('http://localhost/penumbra/model/weather_h1.json'));
+  const keys=[...w.stores.get('penumbra-shell-v4-1').keys()];assert.ok(keys.every(k=>k.startsWith('http://localhost/penumbra/')));assert.ok(keys.includes('http://localhost/penumbra/model/weather_h1.json'));
   w.state.online=false;
   const saved=await w.send('fetch',{method:'GET',url:'http://localhost/penumbra/?installed=1',mode:'navigate'});
   assert.equal(await saved.text(),'shell:index.html');

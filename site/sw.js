@@ -1,5 +1,5 @@
 // Relative URLs keep the installed app inside its GitHub Pages sub-path.
-const SHELL='penumbra-shell-v3-1',RUNTIME='penumbra-runtime-v3-1';
+const SHELL='penumbra-shell-v4-1',RUNTIME='penumbra-runtime-v4-1';
 const shell=['./','index.html','app.js','site-state.js','forecast.js','style.css','vendor/uPlot.esm.js','vendor/uPlot.min.css','manifest.webmanifest','icons/moon-192.png','icons/moon-512.png','model/weather_h1.json','data/shifts.json'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
   await (await caches.open(SHELL)).addAll(shell);await self.skipWaiting();

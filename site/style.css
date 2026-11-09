@@ -43,3 +43,10 @@
 #place-controls,#site-controls{display:contents}
 @media(max-width:650px){.controls{display:contents}#place-controls,#site-controls{display:block;padding:18px;background:var(--soft)}#place-controls{border-bottom:1px solid var(--line)}#site-controls{border-top:1px solid var(--line)}}
 @media(max-width:650px){.instrument{display:flex;flex-direction:column}#place-controls{order:1}.output{order:2}#site-controls{order:3}}
+/* V4 decision controls retain the existing colour tokens and touch sizes. */
+#mobile-setup-summary{display:none}
+#setup-summary{display:block;font-weight:400;overflow-wrap:anywhere}
+#load-planner{margin-top:8px}#load-result{margin-top:12px;overflow-wrap:anywhere}
+.status-row{flex-wrap:wrap}.status-row p{flex:1;min-width:140px}
+.status-row button{flex:none;padding:8px;font-size:12px}
+@media(max-width:650px){#mobile-setup-summary{display:flex;width:100%;justify-content:flex-start;text-align:left;font-weight:400;padding:8px 0;overflow-wrap:anywhere}.risk-heading{flex-wrap:wrap;gap:8px}.risk output{font-size:16px}.totals span{letter-spacing:0}}

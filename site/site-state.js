@@ -15,7 +15,7 @@ export function validateArrays(arrays) {
   if(!Array.isArray(arrays)||arrays.length<1||arrays.length>3)throw new RangeError('Choose one to three arrays.');
   return arrays.map((a,i)=>{
     const {capacity,tilt,azimuth}=a;
-    if(![capacity,tilt,azimuth].every(Number.isFinite)||capacity<.001||capacity>1e9||tilt<0||tilt>90||azimuth<0||azimuth>360)throw new RangeError('Invalid array settings.');
+    if(![capacity,tilt,azimuth].every(Number.isFinite)||capacity<=0||capacity>1e9||tilt<0||tilt>90||azimuth<0||azimuth>360)throw new RangeError('Invalid array settings.');
     return {name:String(a.name||`Array ${i+1}`).slice(0,80),capacity,tilt,azimuth};
   });
 }
@@ -62,16 +62,59 @@ export function sunHasSet(day,now=Date.now()) {
   const from=day.horizon===0?(day.remainingFrom??now):-Infinity;
   return !day.rows.some(r=>r.ms>=from&&r.elevation>0);
 }
-export function bestHours(rows) {
+export function bestHours(rows,duration=null) {
+  if(duration!==null&&(!Number.isFinite(duration)||duration<.5||duration>6))return null;
   let best=null;
   const sorted=[...rows].sort((a,b)=>a.ms-b.ms);
-  for(const steps of [8,9,10,11,12])for(let i=0;i+steps<=sorted.length;i++) {
+  const lengths=duration===null?[8,9,10,11,12]:[Math.ceil(duration*4)];
+  for(const steps of lengths)for(let i=0;i+steps<=sorted.length;i++) {
     const group=sorted.slice(i,i+steps);
     if(group.some((r,j)=>r.ms!==group[0].ms+j*900000||!Number.isFinite(r.p10)))continue;
-    const energy=group.reduce((s,r)=>s+r.p10*.25,0);
-    if(energy>0&&(!best||energy>best.energy+1e-12))best={start:group[0].ms,end:group.at(-1).ms+900000,energy,hours:steps/4};
+    // A fractional final interval uses only the requested fraction of its energy.
+    const energy=group.reduce((s,r,j)=>s+r.p10*Math.min(.25,duration===null ? .25 : duration-j*.25),0);
+    if((duration!==null||energy>0)&&(!best||energy>best.energy+1e-12))best={start:group[0].ms,end:group[0].ms+(duration??steps/4)*3600000,energy,hours:duration??steps/4};
   }
   return best;
+}
+export function loadWindow(rows,power,duration) {
+  if(!Number.isFinite(power)||power<=0)return null;
+  const best=bestHours(rows,duration);if(!best)return null;
+  const need=power*duration,expectedEnergy=rows.filter(r=>r.ms>=best.start&&r.ms<best.end).reduce((s,r)=>s+r.p50*Math.min(.25,(best.end-r.ms)/3600000),0);
+  return {...best,need,expectedEnergy,lowShare:Math.min(1,best.energy/need),expectedShare:Math.min(1,expectedEnergy/need)};
+}
+export const absoluteDate=date=>new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(date+'T12:00Z'));
+export function savedForecastLabel(day,fetchedAt,now=Date.now()) {
+  const ms=Date.parse(fetchedAt),date=localDate(ms,day.timezone),today=localDate(now,day.timezone);
+  const time=new Intl.DateTimeFormat('en-GB',{timeZone:day.timezone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(ms);
+  const when=date===today?'':date===addDay(today,-1)?' yesterday':` on ${absoluteDate(date)}`;
+  return `Saved forecast for ${absoluteDate(day.date)} · fetched ${time}${when}`;
+}
+export function convertUnits(site,unit) {
+  const factor=site.unit===unit?1:unit==='MW' ? .001 : 1000;
+  const convert=v=>Number((v*factor).toPrecision(15));
+  return {...site,unit,arrays:site.arrays.map(a=>({...a,capacity:convert(a.capacity)})),acLimit:site.acLimit==null?null:convert(site.acLimit)};
+}
+export function setupSummary(site,example=false) {
+  const number=v=>v.toLocaleString('en-GB',{maximumSignificantDigits:10});
+  const compass=['N','NE','E','SE','S','SW','W','NW'];
+  const bearings=[...new Set(site.arrays.map(a=>a.azimuth%45===0?compass[Math.round(a.azimuth/45)%8]:`${number(a.azimuth)}°`))];
+  return [example?'Example setup':null,`${number(site.arrays.reduce((s,a)=>s+a.capacity,0))} ${site.unit}`,site.arrays.length>1?`${site.arrays.length} arrays`:null,bearings.join(' + '),site.acLimit==null?null:`AC limit ${number(site.acLimit)} ${site.unit}`].filter(Boolean).join(' · ');
+}
+export const ledgerModelVersion=doc=>doc.model??doc.model_version??(doc.target_date>='2026-11-08'?'v2':'v1');
+/** Deduplicate pending requests; successful weather expires 30 minutes after fetch. */
+export function expiringCache(ttl=30*60000,now=()=>Date.now()) {
+  const entries=new Map();
+  return {
+    clear(){entries.clear();},
+    get(key,load){
+      let entry=entries.get(key);
+      if(!entry||(entry.fetchedAt!==null&&(now()-entry.fetchedAt>=ttl||now()<entry.fetchedAt))) {
+        entry={fetchedAt:null};entries.set(key,entry);
+        entry.promise=Promise.resolve().then(load).then(value=>{entry.fetchedAt=now();return {value,fetchedAt:new Date(entry.fetchedAt).toISOString()};}).catch(error=>{if(entries.get(key)===entry)entries.delete(key);throw error;});
+      }
+      return entry.promise;
+    }
+  };
 }
 export function encodeSite(site) {
   const a=validateArrays(site.arrays),p=new URLSearchParams({lat:site.latitude,lon:site.longitude,name:site.name,unit:site.unit,risk:site.risk,horizon:site.horizon,arrays:JSON.stringify(a)});

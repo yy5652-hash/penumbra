@@ -1,17 +1,18 @@
 import uPlot from './vendor/uPlot.esm.js';
 import {forecast,quantileAt,verifyChain,MODELS,solarPosition} from './forecast.js';
-import {defaultArray,localDate,addDay,modelHorizon,meteoAzimuth,geometryKey,isReference,combineArrays,needsGTIFallback,completeDay,sunHasSet,bestHours,encodeSite,decodeSite,siteStore,recentScores,scoreMeans,powerTick} from './site-state.js';
+import {defaultArray,localDate,addDay,modelHorizon,meteoAzimuth,geometryKey,isReference,combineArrays,needsGTIFallback,completeDay,sunHasSet,bestHours,loadWindow,absoluteDate,savedForecastLabel,setupSummary,convertUnits,expiringCache,ledgerModelVersion,encodeSite,decodeSite,siteStore,recentScores,scoreMeans,powerTick} from './site-state.js';
 const $=id=>document.getElementById(id);
 const WEATHER='https://previous-runs-api.open-meteo.com/v1/forecast';
 const GTI='https://api.open-meteo.com/v1/forecast';
 const GEOCODE='https://geocoding-api.open-meteo.com/v1/search';
 let location={name:'Brussels, Belgium',latitude:50.85,longitude:4.37,timezone:'Europe/Brussels'};
-const modelPromises=new Map(),weatherPromises=new Map(),gtiPromises=new Map();
+const modelPromises=new Map(),weatherCache=expiringCache(),gtiCache=expiringCache();
 let current,forecastPlot,ledgerPlot,runId=0,searchId=0,selectedSiteId=null,map,pin,hasRequestedForecast=false;
 let dayForecasts=new Map();
-let exampleSite=true,installPrompt;
+let exampleSite=true,installPrompt,capacityUnit='kW';
 const store=siteStore();let savedSites=store.read();
 const fmt=(v,d=2)=>Number.isFinite(v)?v.toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
+const fmtPower=(v,unit)=>fmt(v,unit==='MW'?5:2);
 const percent=v=>Number.isFinite(v)?`${fmt(v*100,1)}%`:'—';
 const clock=(ms,tz)=>new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(ms));
 const offsetClock=(ms,tz)=>new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',hourCycle:'h23',timeZoneName:'shortOffset'}).format(new Date(ms));
@@ -40,7 +41,7 @@ function renderArrays(arrays) {
   arrays.forEach((array,i)=>{
     const el=document.createElement('fieldset');el.className='array';
     const legend=document.createElement('legend');legend.className='sr-only';legend.textContent=`Array ${i+1}`;el.append(legend);
-    for(const [key,label,min,max] of [['name','Name'],['capacity','Capacity',.001,1e9],['tilt','Tilt · degrees',0,90],['azimuth','Direction · degrees from north',0,360]]) {
+    for(const [key,label,min,max] of [['name','Name'],['capacity','Capacity',capacityUnit==='MW'?.000001:.001,1e9],['tilt','Tilt · degrees',0,90],['azimuth','Direction · degrees from north',0,360]]) {
       const id=i===0?({name:'array-name',capacity:'capacity',tilt:'tilt',azimuth:'azimuth'}[key]):`array-${i}-${key}`;
       const field=document.createElement('div');field.className=`array-field field-${key}`;
       const l=document.createElement('label');l.htmlFor=id;l.textContent=key==='tilt'?'Tilt °':key==='azimuth'?'Direction':label;field.append(l);
@@ -55,6 +56,7 @@ function renderArrays(arrays) {
         select.addEventListener('change',()=>{input.hidden=select.value!=='custom';if(!input.hidden)input.focus();else{input.value=select.value;panelsChanged();}});
       }
       if(key==='name')input.maxLength=80;else{input.min=min;input.max=max;input.step='any';}
+      input.addEventListener('input',()=>{exampleSite=false;$('example-label').hidden=true;updateSetupSummary();syncSaveButton();});
       input.addEventListener('change',panelsChanged);
       if(key!=='azimuth')field.append(input);el.append(field);
     }
@@ -62,20 +64,33 @@ function renderArrays(arrays) {
     $('arrays').append(el);
   });
   $('add-array').disabled=arrays.length>=3;
+  updateSetupSummary();
+}
+function updateSetupSummary(){
+  const summary=setupSummary(config(),exampleSite);
+  $('setup-summary').textContent=summary;$('mobile-setup-summary').textContent=summary;
+  $('ac-limit').min=capacityUnit==='MW'?.000001:.001;
 }
 function panelsChanged(){
+  exampleSite=false;$('example-label').hidden=true;updateSetupSummary();
   syncSaveButton();
   if(!hasRequestedForecast)return;
   if($('forecast-form').checkValidity())runForecast();
   else{runId++;current=null;$('forecast-result').hidden=true;$('run').disabled=false;$('forecast-status').textContent='Check the panel settings, then select Forecast.';}
 }
-$('add-array').addEventListener('click',()=>{const arrays=readArrays();if(arrays.length>=3)return;arrays.push({...defaultArray(),name:`Array ${arrays.length+1}`});renderArrays(arrays);panelsChanged();});
-for(const id of ['unit','ac-limit'])$(id).addEventListener('change',panelsChanged);
+$('add-array').addEventListener('click',()=>{const arrays=readArrays();if(arrays.length>=3)return;arrays.push({...defaultArray(),capacity:capacityUnit==='MW'?.005:5,name:`Array ${arrays.length+1}`});renderArrays(arrays);panelsChanged();});
+$('unit').addEventListener('change',()=>{
+  const converted=convertUnits({...config(),unit:capacityUnit},$('unit').value);capacityUnit=converted.unit;
+  $('ac-limit').value=converted.acLimit??'';renderArrays(converted.arrays);panelsChanged();
+});
+$('ac-limit').addEventListener('change',panelsChanged);
+$('ac-limit').addEventListener('input',()=>{exampleSite=false;$('example-label').hidden=true;updateSetupSummary();syncSaveButton();});
+$('mobile-setup-summary').addEventListener('click',()=>{$('array-settings').open=true;$('array-settings').scrollIntoView({block:'center'});$('array-settings').querySelector('summary').focus();});
 function setHash(){history.replaceState(null,'',`#${encodeSite(config())}`);}
 function applyConfig(site) {
   exampleSite=false;$('example-label').hidden=true;
   location={name:site.name,latitude:site.latitude,longitude:site.longitude,timezone:site.timezone};
-  $('latitude').value=site.latitude;$('longitude').value=site.longitude;$('unit').value=site.unit;$('risk').value=site.risk;$('horizon').value=site.horizon;$('ac-limit').value=site.acLimit??'';
+  $('latitude').value=site.latitude;$('longitude').value=site.longitude;$('unit').value=site.unit;capacityUnit=site.unit;$('risk').value=site.risk;$('horizon').value=site.horizon;$('ac-limit').value=site.acLimit??'';
   renderArrays(site.arrays);$('location-name').textContent=site.name;movePin();
 }
 function restoreHash(){const site=decodeSite(window.location.hash);if(!site)return false;selectedSiteId=savedSites.find(s=>s.hash===encodeSite(site))?.id??null;applyConfig(site);return true;}
@@ -106,7 +121,7 @@ for(const name of ['latitude','longitude'])$(name).addEventListener('input',()=>
   location={name:'Selected coordinates',latitude:Number($('latitude').value),longitude:Number($('longitude').value),timezone:null};selectedSiteId=null;
   $('location-name').textContent=location.name;if($('latitude').validity.valid&&$('longitude').validity.valid)movePin();
   runId++;current=null;$('forecast-result').hidden=true;$('retry').hidden=true;$('run').disabled=false;$('forecast-status').textContent='Select Forecast to update.';
-  syncSaveButton();
+  syncSaveButton();updateSetupSummary();
 });
 $('map-picker').addEventListener('toggle',async()=>{
   if(!$('map-picker').open)return;if(map){map.invalidateSize();return;}
@@ -126,11 +141,12 @@ $('map-picker').addEventListener('toggle',async()=>{
 });
 $('forecast-form').addEventListener('submit',e=>{e.preventDefault();runForecast();});
 $('retry').addEventListener('click',()=>runForecast());$('horizon').addEventListener('change',()=>runForecast());
+$('refresh').addEventListener('click',()=>runForecast({refresh:true}));
 async function fetchDay(place,horizon) {
   let tz=place.timezone;
   if(!tz){const meta=new URL(WEATHER);meta.search=new URLSearchParams({latitude:place.latitude,longitude:place.longitude,timezone:'auto'});tz=(await getJSON(meta)).timezone;if(!tz)throw Error('Location timezone unavailable.');}
   const date=addDay(localDate(Date.now(),tz),horizon),h=modelHorizon(horizon),key=`${place.latitude},${place.longitude},${date},${h}`;
-  if(!weatherPromises.has(key))weatherPromises.set(key,(async()=>{
+  const cached=await weatherCache.get(key,async()=>{
     const url=new URL(WEATHER);url.search=new URLSearchParams({latitude:place.latitude,longitude:place.longitude,start_date:addDay(date,-1),end_date:addDay(date,1),hourly:['shortwave_radiation','direct_radiation','cloud_cover','temperature_2m'].map(v=>v+`_previous_day${h+1}`).join(','),models:MODELS.join(','),timezone:'UTC'});
     const [[m,shifts],response]=await Promise.all([model(h),getJSON(url)]);
     const rows=forecast(response,place.latitude,place.longitude,m,shifts,h).filter(r=>localDate(r.ms,tz)===date);
@@ -140,19 +156,19 @@ async function fetchDay(place,horizon) {
     // Polar nights legitimately have zero output; missing daytime data does not.
     if(!rows.length&&completeDay([],date,tz).some(r=>solarPosition(r.ms,place.latitude,place.longitude).elevation>0))throw Error('No daylight forecast available for this date.');
     return {horizon,rows,timezone:tz,date,location:{...place,timezone:tz},modelMonth:m.month,calibrationThrough:shifts.through};
-  })().catch(e=>{weatherPromises.delete(key);throw e;}));
-  return {...structuredClone(await weatherPromises.get(key)),horizon,location:{...place,timezone:tz}};
+  });
+  return {...structuredClone(cached.value),fetchedAt:cached.fetchedAt,horizon,location:{...place,timezone:tz}};
 }
 async function fetchGTI(site) {
   const geometries=site.arrays.filter(a=>!isReference(a));if(!geometries.length)return {gti:null,fallback:false};
   const start=localDate(Date.now(),site.timezone),end=addDay(start,4);
   const request=async array=>{
     const key=`${site.latitude},${site.longitude},${start},${geometryKey(array)}`;
-    if(!gtiPromises.has(key))gtiPromises.set(key,(async()=>{
+    const cached=await gtiCache.get(key,async()=>{
       const url=new URL(GTI);url.search=new URLSearchParams({latitude:site.latitude,longitude:site.longitude,start_date:addDay(start,-1),end_date:end,hourly:'global_tilted_irradiance',tilt:array.tilt,azimuth:meteoAzimuth(array.azimuth),timezone:'UTC'});
       const response=await getJSON(url);
       if(!response.hourly?.global_tilted_irradiance?.some(Number.isFinite))throw Error('GTI unavailable.');return response;
-    })().catch(e=>{gtiPromises.delete(key);throw e;}));return gtiPromises.get(key);
+    });return cached.value;
   };
   try {
     const [reference,...tilted]=await Promise.all([request(defaultArray()),...geometries.map(request)]);
@@ -171,17 +187,19 @@ function showSaved(snapshot) {
   applyConfig(snapshot.site);current=snapshot.current;dayForecasts=new Map(snapshot.days);$('forecast-result').hidden=false;
   for(const day of [current,...dayForecasts.values()])if(day.horizon===0)day.remainingFrom=Date.parse(snapshot.savedAt);
   $('result-title').textContent=current.location.name;$('result-date').textContent=`${dayLabel(current.horizon)} · ${current.date} · ${current.timezone}`;
-  $('forecast-status').textContent='Saved forecast · offline';$('offline-note').hidden=false;$('offline-note').textContent=`Offline · saved at ${new Date(snapshot.savedAt).toLocaleString('en-GB')} · forecast date ${current.date}.`;
+  const saved=savedForecastLabel(current,current.fetchedAt??snapshot.savedAt);
+  $('forecast-status').textContent=saved;$('offline-note').hidden=false;$('offline-note').textContent=saved;
   $('model-version').textContent=`Weather only · D+${modelHorizon(current.horizon)} · ${current.modelMonth}`;
   $('region-notice').hidden=location.latitude>=35&&location.latitude<=60&&location.longitude>=-15&&location.longitude<=30;
   updateResult();
 }
-async function runForecast() {
+async function runForecast({refresh=false}={}) {
   if(!$('forecast-form').checkValidity()){$('array-settings').open=true;$('forecast-form').reportValidity();return;}
   hasRequestedForecast=true;
-  $('example-label').hidden=!exampleSite;syncSaveButton();
+  $('example-label').hidden=!exampleSite;syncSaveButton();updateSetupSummary();
+  if(refresh){weatherCache.clear();gtiCache.clear();}
   const id=++runId,site=config();current=null;dayForecasts=new Map();
-  $('run').disabled=true;$('retry').hidden=true;$('forecast-result').hidden=true;$('result-title').textContent=site.name;$('location-name').textContent=site.name;
+  $('run').disabled=true;$('refresh').disabled=true;$('retry').hidden=true;$('forecast-result').hidden=true;$('result-title').textContent=site.name;$('location-name').textContent=site.name;
   $('region-notice').hidden=site.latitude>=35&&site.latitude<=60&&site.longitude>=-15&&site.longitude<=30;
   $('forecast-status').textContent='Loading your solar forecast…';$('offline-note').hidden=true;
   try {
@@ -192,16 +210,18 @@ async function runForecast() {
     current={...day,...geometry};dayForecasts.set(day.horizon,current);
     $('forecast-result').hidden=false;$('result-date').textContent=`${dayLabel(site.horizon)} · ${day.date} · ${day.timezone} · 15-minute intervals`;
     $('model-version').textContent=`Weather only · D+${modelHorizon(site.horizon)} · ${day.modelMonth}`;
-    $('forecast-status').textContent=`Ready · calibration through ${day.calibrationThrough}`;
+    const calibrated=new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(day.calibrationThrough+'T12:00Z'));
+    $('forecast-status').textContent=`Weather fetched ${clock(Date.parse(day.fetchedAt),day.timezone)} · model calibrated through ${calibrated}`;
     updateResult();setHash();saveSnapshot();
-    // Populate tomorrow's best-hours window first, then the remaining day cards.
-    for(const h of [1,0,2,3].filter(h=>h!==site.horizon)) {
+    $('run').disabled=false;$('refresh').disabled=false;
+    // Other days load independently after the selected day has rendered.
+    await Promise.all([0,1,2,3].filter(h=>h!==site.horizon).map(async h=>{
       try {const next=await fetchDay(site,h);if(id!==runId)return;dayForecasts.set(h,{...next,...geometry});}
       catch{if(id!==runId)return;dayForecasts.set(h,{error:true});}
-      updateDayCards();updateBestHours();saveSnapshot();
-    }
+      updateDayCards();saveSnapshot();
+    }));
   }catch(e){if(id!==runId)return;const snapshot=await readSnapshot();if(id!==runId)return;if(snapshot&&encodeSite(snapshot.site)===encodeSite(config())){showSaved(snapshot);return;}$('forecast-status').textContent=`Forecast unavailable. ${e.name==='TimeoutError'?'Request timed out.':e.message}`;$('retry').hidden=false;}
-  finally{if(id===runId)$('run').disabled=false;}
+  finally{if(id===runId){$('run').disabled=false;$('refresh').disabled=false;}}
 }
 function outputRows(day,site=config()) {
   return combineArrays(completeDay(day.rows,day.date,day.timezone,day.horizon===0?(day.remainingFrom??Date.now()):-Infinity),site.arrays,site.acLimit,day.gti).map(r=>({...r,commit:quantileAt(r.p10,r.p50,r.p90,1-site.risk/100)}));
@@ -211,21 +231,31 @@ function updateDayCards() {
   for(const h of [0,1,2,3]) {
     const b=document.createElement('button');b.type='button';b.className='secondary day-card';b.setAttribute('aria-pressed',String(h===Number($('horizon').value)));
     const title=document.createElement('strong');title.textContent=dayLabel(h);b.append(title);const text=document.createElement('span'),day=dayForecasts.get(h);
-    if(day&&!day.error){const rows=outputRows(day),sum=k=>rows.reduce((s,r)=>s+r[k]*.25,0);const sunset=sunHasSet(day);text.textContent=sunset?'Sun has set':`${fmt(sum('p50'))} ${eu}`;b.setAttribute('aria-label',sunset?`${dayLabel(h)} · Sun has set`:`${dayLabel(h)} · P50 ${text.textContent} · P10–P90 ${fmt(sum('p10'))}–${fmt(sum('p90'))} ${eu}`);b.append(text);}
+    if(day&&!day.error){const rows=outputRows(day),sum=k=>rows.reduce((s,r)=>s+r[k]*.25,0);const sunset=sunHasSet(day);text.textContent=sunset?'Sun has set':`${fmtPower(sum('p50'),$('unit').value)} ${eu}`;b.setAttribute('aria-label',sunset?`${dayLabel(h)} · Sun has set`:`${dayLabel(h)} · P50 ${text.textContent} · P10–P90 ${fmtPower(sum('p10'),$('unit').value)}–${fmtPower(sum('p90'),$('unit').value)} ${eu}`);b.append(text);}
     else{text.textContent=day?.error?'Unavailable':'Loading…';b.append(text);}
     b.addEventListener('click',()=>{if(current&&h===current.horizon)return;$('horizon').value=h;runForecast();});$('day-totals').append(b);
   }
 }
 function updateBestHours() {
-  const day=dayForecasts.get(1),eu=$('unit').value==='MW'?'MWh':'kWh';
-  const best=day&&!day.error?bestHours(outputRows(day)):null;
+  const day=current,eu=$('unit').value==='MW'?'MWh':'kWh';
+  const rows=day?outputRows(day).filter(r=>day.horizon!==0||r.ms>=Date.now()):[],best=day?bestHours(rows):null;
   if(current)current.bestHours=best?{...best,date:day.date,timezone:day.timezone,energyUnit:eu}:null;
+  $('best-window').hidden=!day||!rows.some(r=>r.p50>0);
   $('csv').disabled=!day;$('json').disabled=!day;
-  $('best-hours').textContent=!day?'Finding your most reliable window…':day.error?'Tomorrow’s forecast is unavailable.':best?`Most reliable hours to run the washing machine or charge the car: ${clock(best.start,day.timezone)}–${clock(best.end,day.timezone)}, at least ${fmt(best.energy)} ${eu} (P10).`:'No positive P10 window available tomorrow.';
+  if(!day)return;
+  $('best-heading').textContent=`Best solar window · ${absoluteDate(day.date)}`;
+  $('best-hours').textContent=best?`${clock(best.start,day.timezone)}–${clock(best.end,day.timezone)} · low case ${fmtPower(best.energy,$('unit').value)} ${eu}`:rows.some(r=>r.p10>0)?'No continuous 2–3 hour window remains on this day.':`Low-case generation is 0.00 ${eu} across this day.`;
+  // Load power is always entered in kW, independently of the site's display unit.
+  const power=$('load-power'),duration=$('load-duration');
+  const check=power.value!==''&&duration.value!==''&&power.checkValidity()&&duration.checkValidity()?loadWindow(rows.map(r=>({...r,p10:r.p10*(current.unit==='MW'?1000:1),p50:r.p50*(current.unit==='MW'?1000:1)})),Number(power.value),Number(duration.value)):null;
+  current.loadPlan=check?{...check,date:day.date,timezone:day.timezone,energyUnit:'kWh'}:null;
+  $('load-result').hidden=!check;
+  if(check)$('load-result').textContent=`${clock(check.start,day.timezone)}–${clock(check.end,day.timezone)} · low case covers ${fmt(Math.min(check.energy,check.need),1)} of ${fmt(check.need,1)} kWh (${fmt(check.lowShare*100,0)}%) · expected (P50) covers ${fmt(Math.min(check.expectedEnergy,check.need),1)} of ${fmt(check.need,1)} kWh (${fmt(check.expectedShare*100,0)}%)`;
 }
+for(const id of ['load-power','load-duration'])$(id).addEventListener('input',updateBestHours);
 function chart(target,data,series,bands,tz,unit) {
   const css=getComputedStyle(document.documentElement), ink=css.getPropertyValue('--muted').trim(), grid=css.getPropertyValue('--line').trim();
-  const powerValue=(_u,v)=>v==null?'—':`${fmt(v)} ${unit}`;
+  const powerValue=(_u,v)=>v==null?'—':`${fmtPower(v,unit)} ${unit}`;
   return new uPlot({width:Math.max(240,target.clientWidth),height:260,legend:{show:false},cursor:{drag:{x:false,y:false}},select:{show:false},scales:{y:{range:(_u,min,max)=>[0,Math.max(.01,max*1.1)]}},series:[{label:'Time',value:(_u,v)=>v==null?'—':offsetClock(v*1000,tz)},...series.map(s=>({...s,points:{show:false},value:powerValue}))],bands,axes:[{stroke:ink,grid:{show:false},size:40,space:65,font:'11px system-ui',values:(_u,ticks)=>ticks.map(t=>clock(t*1000,tz))},{stroke:ink,grid:{stroke:grid,width:1},size:68,font:'10px system-ui',values:(_u,ticks)=>ticks.map(v=>unit==='%'?`${fmt(v,0)}%`:powerTick(v,unit))}]},data,target);
 }
 function updateResult() {
@@ -237,18 +267,18 @@ function updateResult() {
   for(const el of document.querySelectorAll('.daylight-only'))el.hidden=sunset;
   current.geometryFallback=current.fallback||needsGTIFallback(current.rows,site.arrays,current.gti);
   $('geometry-note').textContent=current.geometryFallback?'GTI unavailable · using the clear-sky orientation estimate.':adjusted?'Panel directions adjusted with forecast irradiance.':'35° south · fleet forecast unchanged.';
-  if(site.acLimit!==null)$('geometry-note').textContent+=` Site AC limit: ${fmt(site.acLimit)} ${unit}.`;
+  if(site.acLimit!==null)$('geometry-note').textContent+=` Site AC limit: ${fmtPower(site.acLimit,unit)} ${unit}.`;
   const energy=key=>rows.reduce((s,r)=>s+r[key]*.25,0);
   const eu=unit==='MW'?'MWh':'kWh';
-  $('total-low').textContent=`${fmt(energy('p10'))} ${eu}`; $('total-mid').textContent=`${fmt(energy('p50'))} ${eu}`; $('total-high').textContent=`${fmt(energy('p90'))} ${eu}`;
-  $('risk-value').textContent=`${fmt(level*100,0)}%`;
+  $('total-low').textContent=`${fmtPower(energy('p10'),unit)} ${eu}`; $('total-mid').textContent=`${fmtPower(energy('p50'),unit)} ${eu}`; $('total-high').textContent=`${fmtPower(energy('p90'),unit)} ${eu}`;
+  $('risk-value').textContent=`${fmt(level*100,0)}% margin`;
   const peak=Math.max(0,...rows.map(r=>r.commit));
-  $('commitment').textContent=`At ${fmt(level*100,0)}%: ${fmt(energy('commit'))} ${eu} to commit across the day, with a peak commitment of ${fmt(peak)} ${unit}.`;
-  $('forecast-summary').textContent=`${current.location.name}, ${current.date}: central energy estimate ${fmt(energy('p50'))} ${eu}; summed P10–P90 estimates ${fmt(energy('p10'))}–${fmt(energy('p90'))} ${eu}. Dashed line: ${fmt(level*100,0)}% commitment. All times in ${current.timezone}. Overnight power is zero.`;
+  $('commitment').textContent=`Conservative plan for the day: ${fmtPower(energy('commit'),unit)} ${eu}, peak ${fmtPower(peak,unit)} ${unit}`;
+  $('forecast-summary').textContent=`${current.location.name}, ${current.date}: Expected (P50) ${fmtPower(energy('p50'),unit)} ${eu}; Low (P10) ${fmtPower(energy('p10'),unit)} ${eu}; High (P90) ${fmtPower(energy('p90'),unit)} ${eu}. Dashed line: conservative plan at ${fmt(level*100,0)}% margin. All times in ${current.timezone}.`;
   const css=getComputedStyle(document.documentElement), accent=css.getPropertyValue('--accent').trim(), band=css.getPropertyValue('--band').trim();
   forecastPlot?.destroy(); $('forecast-chart').replaceChildren();
   forecastPlot=null;
-  if(!sunset)forecastPlot=chart($('forecast-chart'),[rows.map(r=>r.ms/1000),rows.map(r=>r.p90),rows.map(r=>r.p10),rows.map(r=>r.p50),rows.map(r=>r.commit)],[{label:'P90',stroke:accent,width:0},{label:'P10',stroke:accent,width:0},{label:'P50',stroke:accent,width:2},{label:'Commit',stroke:accent,width:1.5,dash:[5,4]}],[{series:[1,2],fill:band}],current.timezone,unit);
+  if(!sunset)forecastPlot=chart($('forecast-chart'),[rows.map(r=>r.ms/1000),rows.map(r=>r.p90),rows.map(r=>r.p10),rows.map(r=>r.p50),rows.map(r=>r.commit)],[{label:'High (P90)',stroke:accent,width:0},{label:'Low (P10)',stroke:accent,width:0},{label:'Expected (P50)',stroke:accent,width:2},{label:'Plan',stroke:accent,width:1.5,dash:[5,4]}],[{series:[1,2],fill:band}],current.timezone,unit);
   const hours=new Map();
   for(const r of rows) {
     const key=offsetClock(r.ms,current.timezone).replace(/:\d{2}/,':00');
@@ -257,7 +287,7 @@ function updateResult() {
   const body=$('hourly-table').tBodies[0]; body.replaceChildren();
   for(const [hour,group] of hours) {
     const tr=document.createElement('tr');
-    const values=[hour,...['p10','p50','p90','commit'].map(k=>`${fmt(group.reduce((s,r)=>s+r[k],0)/group.length)} ${unit}`)];
+    const values=[hour,...['p10','p50','p90','commit'].map(k=>`${fmtPower(group.reduce((s,r)=>s+r[k],0)/group.length,unit)} ${unit}`)];
     values.forEach((value,i)=>{const td=document.createElement(i===0?'th':'td');if(i===0)td.scope='row';td.textContent=value;tr.append(td);}); body.append(tr);
   }
   current.exportRows=rows; current.capacity=capacity;current.unit=unit;current.level=level;
@@ -281,17 +311,17 @@ $('csv').addEventListener('click',()=>{
 $('json').addEventListener('click',()=>{
   if(!current||!$('forecast-form').reportValidity())return;
   updateResult();
-  download(JSON.stringify({location:current.location,date:current.date,horizon:current.horizon,modelHorizon:modelHorizon(current.horizon),timezone:current.timezone,capacity:current.capacity,powerUnit:current.unit,confidence:current.level,modelMonth:current.modelMonth,calibrationThrough:current.calibrationThrough,arrays:current.arrays,acLimit:current.acLimit,bestHours:current.bestHours,orientationMethod:current.geometryFallback?'clear-sky fallback':current.arrays.every(isReference)?'identity / 35° south':'Open-Meteo GTI / 35° south',note:'Daily sums of interval quantiles are not calibrated daily quantiles. Adjusted bands have no site-specific calibration.',rows:current.exportRows.map(({time,p10,p50,p90,commit})=>({time,p10,p50,p90,commit}))},null,2),'application/json','json');
+  download(JSON.stringify({location:current.location,date:current.date,horizon:current.horizon,modelHorizon:modelHorizon(current.horizon),timezone:current.timezone,capacity:current.capacity,powerUnit:current.unit,confidence:current.level,planningMargin:current.level,fetchedAt:current.fetchedAt,modelMonth:current.modelMonth,calibrationThrough:current.calibrationThrough,arrays:current.arrays,acLimit:current.acLimit,bestHours:current.bestHours,loadPlan:current.loadPlan,orientationMethod:current.geometryFallback?'clear-sky fallback':current.arrays.every(isReference)?'identity / 35° south':'Open-Meteo GTI / 35° south',rows:current.exportRows.map(({time,p10,p50,p90,commit})=>({time,p10,p50,p90,commit}))},null,2),'application/json','json');
 });
 $('share').addEventListener('click',async()=>{
   if(!$('forecast-form').reportValidity())return;
-  setHash();try{await navigator.clipboard.writeText(window.location.href);$('share-status').textContent='Share link copied. It includes your location, arrays, AC limit, day and confidence.';}
+  setHash();try{await navigator.clipboard.writeText(window.location.href);$('share-status').textContent='Settings link copied: place, arrays, AC limit, horizon and planning margin.';}
   catch{$('share-status').textContent='Copy this share link:';const input=document.createElement('input');input.readOnly=true;input.value=window.location.href;input.setAttribute('aria-label','Share link');$('share-status').append(input);input.select();}
 });
 function previewCard(parent,preview,unit) {
   parent.replaceChildren();
   const text=document.createElement('p');text.className='fine';
-  text.textContent=preview?`${preview.date} · Tomorrow P50 ${fmt(preview.p50)} ${unit==='MW'?'MWh':'kWh'} · P10 floor ${fmt(preview.p10)}`:'Loading tomorrow’s forecast…';parent.append(text);
+  text.textContent=preview?`${preview.date} · Tomorrow Expected (P50) ${fmtPower(preview.p50,unit)} ${unit==='MW'?'MWh':'kWh'} · Low case ${fmtPower(preview.p10,unit)} ${unit==='MW'?'MWh':'kWh'}`:'Loading tomorrow’s forecast…';parent.append(text);
   if(!preview)return;
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 180 40');svg.setAttribute('aria-label','Tomorrow P50 power');svg.setAttribute('role','img');
   const line=document.createElementNS(svg.namespaceURI,'polyline'),max=Math.max(.001,...preview.values);
@@ -349,7 +379,7 @@ $('save-site').addEventListener('click',()=>{
   if(!current||!$('forecast-form').reportValidity())return;
   const name=location.name,id=selectedSiteId||crypto.randomUUID();
   const site={id,name,hash:encodeSite(config())},next=[...savedSites.filter(s=>s.id!==id),site];
-  if(store.write(next)){selectedSiteId=id;savedSites=next;exampleSite=false;$('example-label').hidden=true;renderSites();syncSaveButton();$('save-status').textContent='Site saved on this device.';}
+  if(store.write(next)){selectedSiteId=id;savedSites=next;exampleSite=false;$('example-label').hidden=true;updateSetupSummary();renderSites();syncSaveButton();$('save-status').textContent='Site saved on this device.';}
   else $('save-status').textContent='Storage unavailable or full. Use a share link to keep this site.';
 });
 function renderScoreCard(index,scores) {
@@ -377,7 +407,7 @@ async function loadLedger() {
       return {date,text:await res.text()};
     }));
     const chain=await verifyChain(files);
-    $('chain-status').textContent=chain.ok?`Chain verified: ${chain.count} files`:`Chain broken: ${chain.brokenDate}`;
+    $('chain-status').textContent=chain.ok?`Chain verified: ${chain.count} files`:`Chain broken: ${chain.brokenDate} · ${chain.reason}`;
     const docs=files.map(f=>JSON.parse(f.text));
     const body=$('ledger-table').tBodies[0],archiveBody=$('ledger-archive-table').tBodies[0];body.replaceChildren();archiveBody.replaceChildren();
     $('ledger-archive-table').tHead.replaceChildren(...[...$('ledger-table').tHead.children].map(row=>row.cloneNode(true)));
@@ -387,7 +417,7 @@ async function loadLedger() {
     for(const doc of [...docs].sort((a,b)=>b.target_date.localeCompare(a.target_date)||String(b.issued_at).localeCompare(String(a.issued_at)))) {
       const score=scores.days.find(s=>s.date===doc.target_date);
       for(const [name,key] of [['Elia','elia'],['Penumbra grid','grid']]) {
-        const tr=document.createElement('tr'), values=[`${doc.target_date} / ${doc.issued_at}`,doc.mode,name];
+        const tr=document.createElement('tr'), values=[`${doc.target_date} / ${doc.issued_at}`,doc.mode,key==='grid'?`${name} ${ledgerModelVersion(doc)}`:name];
         for(const metric of scoreMetrics) values.push(score?.[key]?metric==='pinball'?fmt(score[key][metric],4):percent(score[key][metric]):'Pending');
         (rowCount++<8?body:archiveBody).append(cells(tr,values));
       }
@@ -421,7 +451,7 @@ async function loadLedger() {
       const peak=key=>Math.max(...rows.map(r=>r[key]));
       $('ledger-summary').textContent=`${latest.target_date}, Belgium (${latest.mode}): peak Penumbra median ${percent(peak('grid_p50'))}; peak Elia median ${percent(peak('tso_p50'))} of capacity. Shaded ranges show P10–P90. Full daily scores follow below.`;
     }else $('ledger-summary').textContent='No Belgian forecast has been published yet.';
-    $('ledger-status').textContent=`${docs.length} published files · scores updated ${scores.updated_at}${chain.ok?'':'. Caution: the chain check failed; inspect source files before relying on this ledger.'}`;
+    $('ledger-status').textContent=`${docs.length} published files · scores updated ${scores.updated_at}${chain.ok?'':` · ${chain.brokenDate}: ${chain.reason}`}`;
   } catch {
     if(!$('score-content').children.length)$('score-status').textContent='Scores unavailable. Retry in the ledger below.';
     $('ledger-status').textContent='Ledger unavailable. Could not load or verify its files.'; $('ledger-retry').hidden=false;$('chain-status').textContent='Chain not verified';
